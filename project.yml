@@ -1,0 +1,67 @@
+name: Eyeline
+options:
+  bundleIdPrefix: com.omniomo
+  developmentLanguage: en
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  # Icon Composer 的 .icon 是一个文件夹，当成一个文件放进 Resources（Xcode 26 会把它编成 Assets.car 和 AppIcon.icns）。
+  fileTypes:
+    icon:
+      file: true
+      buildPhase: resources
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # 用开发证书签名（不要 ad-hoc）：ad-hoc 每编译一次签名就变，系统会当成另一个 App，
+    # 摄像头、麦克风、屏幕录制的权限每次都要重新给
+    CODE_SIGN_IDENTITY: "Apple Development"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: 88D7C437XC
+    DEAD_CODE_STRIPPING: YES
+targets:
+  Eyeline:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+        excludes:
+          - Resources/Info.plist
+          - Resources/Eyeline.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.omniomo.eyeline
+        INFOPLIST_FILE: Sources/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Sources/Resources/Eyeline.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
+  EyelineTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests
+      - Sources/Core/Tokenizer.swift
+      - Sources/Core/Script.swift
+      - Sources/Core/Tracker.swift
+      - Sources/Core/PagedScript.swift
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.omniomo.eyeline.tests
+schemes:
+  Eyeline:
+    build:
+      targets:
+        Eyeline: all
+    test:
+      targets: [EyelineTests]
+  EyelineCore:
+    build:
+      targets:
+        EyelineTests: [test]
+    test:
+      targets: [EyelineTests]
