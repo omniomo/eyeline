@@ -67,14 +67,14 @@ ZH = {
     "Allow speech recognition in System Settings": "请在系统设置中允许语音识别",
     "≈ %@": "≈ %@",
     "Eyeline": "Eyeline",
-    "Show in Finder": "在访达中显示",
+    "Show in Finder": "在文件夹中显示",
     "Move to Trash": "移到废纸篓",
     "Close  Esc": "关闭  Esc",
     "Allow the camera in System Settings": "请在系统设置中允许使用摄像头",
     "No camera found": "未找到摄像头",
     "The take couldn’t be saved": "录像未能存储",
     "Takes": "录像",
-    "Open in Finder": "在访达中打开",
+    "Open in Finder": "打开文件夹",
     "Keywords": "关键词",
     "Next keyword  ⌥→": "下一个关键词  ⌥→",
     "Previous Keyword": "上一个关键词",
@@ -206,6 +206,9 @@ ZH = {
     "Move to Applications": "移到「应用程序」",
     "Couldn’t move Eyeline — drag it into Applications": "没能移过去，请把 Eyeline 拖进「应用程序」",
     "Open at login": "登录时打开",
+    "Deleted “%@”": "已删除「%@」",
+    "Undo": "撤销",
+    "Press ⌘⌫ to delete": "按 ⌘⌫ 删除",
 }
 
 catalog = {"sourceLanguage": "en", "strings": {}, "version": "1.0"}

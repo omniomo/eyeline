@@ -7,9 +7,9 @@ cd "$(dirname "$0")/.."
 APP=$1
 OUT=$2
 VENV=.build/dmgbuild
-if [ ! -x "$VENV/bin/dmgbuild" ]; then
+if ! "$VENV/bin/python" -c "import importlib.metadata as m; assert m.version(\"dmgbuild\") == \"2.0.0\"" 2>/dev/null; then
   python3 -m venv "$VENV"
-  "$VENV/bin/pip" install --quiet --disable-pip-version-check "dmgbuild==1.6.5"
+  "$VENV/bin/pip" install --quiet --disable-pip-version-check "dmgbuild==2.0.0"
 fi
 WORK=$(mktemp -d /tmp/eyeline-dmg.XXXXXX)
 trap 'rm -rf "$WORK"' EXIT

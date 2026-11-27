@@ -82,7 +82,6 @@ struct ScriptEditor: NSViewRepresentable {
             coordinator.applying = true
             textView.string = text
             textView.restyle()
-            textView.undoManager?.removeAllActions()
             coordinator.applying = false
             let offset = min(focus?.offset ?? 0, (text as NSString).length)
             textView.setSelectedRange(NSRange(location: offset, length: 0))
@@ -95,6 +94,8 @@ struct ScriptEditor: NSViewRepresentable {
             }
         } else if textView.string != text && !coordinator.editing && !textView.hasMarkedText() {
             // 外面改了字（输入法还在组字时不动它）：换掉，光标留在原来的地方，不跳到结尾
+            // 这份稿子之前的撤销记录对不上了，丢掉
+            coordinator.forgetUndo(for: coordinator.documentID)
             let selection = textView.selectedRange()
             coordinator.applying = true
             textView.string = text
@@ -129,6 +130,22 @@ struct ScriptEditor: NSViewRepresentable {
         var editing = false
 
         init(_ parent: ScriptEditor) { self.parent = parent }
+
+        /// 每份稿子自己的撤销记录。以前换稿子时把整个窗口的撤销清空了，删掉一份讲稿后 ⌘Z 就找不回来；
+        /// 现在打字的撤销跟着各自的稿子走，窗口的撤销（删除、改名）不受影响。
+        private var undoManagers: [UUID: UndoManager] = [:]
+
+        func undoManager(for view: NSTextView) -> UndoManager? {
+            guard let id = documentID else { return nil }
+            if let manager = undoManagers[id] { return manager }
+            let manager = UndoManager()
+            undoManagers[id] = manager
+            return manager
+        }
+
+        func forgetUndo(for id: UUID?) {
+            if let id { undoManagers[id] = nil }
+        }
 
         func textDidChange(_ notification: Notification) {
             // 输入法还在组字（拼音、语音输入的半成品）：先不交给外面，等字定下来那一下再交

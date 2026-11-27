@@ -401,6 +401,16 @@
         }
       }
     },
+    "Deleted “%@”": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已删除「%@」"
+          }
+        }
+      }
+    },
     "Deleted “%@” · ⌘Z to undo": {
       "localizations": {
         "zh-Hans": {
@@ -1186,7 +1196,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在访达中打开"
+            "value": "打开文件夹"
           }
         }
       }
@@ -1287,6 +1297,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "播放  空格"
+          }
+        }
+      }
+    },
+    "Press ⌘⌫ to delete": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按 ⌘⌫ 删除"
           }
         }
       }
@@ -1546,7 +1566,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在访达中显示"
+            "value": "在文件夹中显示"
           }
         }
       }
@@ -1917,6 +1937,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在转换幻灯片…"
+          }
+        }
+      }
+    },
+    "Undo": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "撤销"
           }
         }
       }

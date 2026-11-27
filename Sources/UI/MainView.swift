@@ -129,13 +129,7 @@ struct Sidebar: View {
                 if let url { withAnimation(.omoOut(0.35)) { proxy.scrollTo(url) } }
             }
         }
-        .onDeleteCommand {
-            switch model.sidebarSelection {
-            case .script(let id): model.delete(id, undoManager: undoManager)
-            case .take(let url): model.trashTake(url)
-            case nil: break
-            }
-        }
+        // 删除要按 ⌘⌫（光按 ⌫ 太容易误删）：在 AppModel 的按键监听里
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button { model.newScript() } label: { Image(systemName: "square.and.pencil") }
@@ -148,21 +142,22 @@ struct Sidebar: View {
         }
     }
 
-    /// 右键菜单：讲稿是改名、创建副本、移除幻灯片、删除；录好的视频是在访达中显示、移到废纸篓。
+    /// 右键菜单（每一项前面一个图标）：讲稿是改名、创建副本、移除幻灯片、删除；录好的视频是在文件夹中显示、移到废纸篓。
     @ViewBuilder private func menu(for item: AppModel.SidebarItem) -> some View {
         switch item {
         case .script(let id):
-            Button("Rename") { model.renaming = id }
-            Button("Duplicate") { model.duplicate(id) }
+            Button { model.renaming = id } label: { Label("Rename", systemImage: "pencil") }
+            Button { model.duplicate(id) } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
             if store[id]?.slides != nil {
-                Button("Remove Slides") { model.removeSlides(id, undoManager: undoManager) }
+                Button { model.removeSlides(id, undoManager: undoManager) } label: { Label("Remove Slides", systemImage: "minus.rectangle") }
             }
             Divider()
-            Button("Delete", role: .destructive) { model.delete(id, undoManager: undoManager) }
+            Button(role: .destructive) { model.delete(id, undoManager: undoManager) } label: { Label("Delete", systemImage: "trash") }
+                .keyboardShortcut(.delete, modifiers: .command)
         case .take(let url):
-            Button("Show in Finder") { recorder.reveal(url) }
+            Button { recorder.reveal(url) } label: { Label("Show in Finder", systemImage: "folder") }
             Divider()
-            Button("Move to Trash", role: .destructive) { model.trashTake(url) }
+            Button(role: .destructive) { model.trashTake(url) } label: { Label("Move to Trash", systemImage: "trash") }
         }
     }
 }

@@ -440,6 +440,12 @@ final class AppModel: ObservableObject {
                 if event.keyCode == 53 { self.endQuickStart() } else { self.nextCoachStep() }
                 return nil
             }
+            // 左边列表里：⌘⌫ 才删；光按 ⌫ 只提示一下怎么删
+            if let self, event.keyCode == 51, NSApp.keyWindow?.firstResponder is NSTableView, self.sidebarSelection != nil {
+                let flags = event.modifierFlags.intersection([.command, .control, .option, .shift])
+                if flags == .command { self.deleteSidebarSelection(); return nil }
+                if flags.isEmpty { self.announce(String(localized: "Press ⌘⌫ to delete")); return nil }
+            }
             guard let self, self.prompter.isActive else { return event }
             let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
             guard modifiers.isEmpty else { return event }
@@ -674,13 +680,26 @@ final class AppModel: ObservableObject {
         let document = store.documents[index]
         store.remove(id)
         if selection == id { selection = store.documents[safe: index]?.id ?? store.documents.last?.id }
-        undoManager?.registerUndo(withTarget: self) { model in
-            model.store.restore(document, at: index)
-            model.selection = document.id
+        // 找回来：⌘Z（列表里）和提示上的「撤销」都走这里；已经找回来了就不再加一遍
+        let restore: () -> Void = { [weak self] in
+            guard let self, self.store[document.id] == nil else { return }
+            self.store.restore(document, at: index)
+            self.selection = document.id
+            self.notice = nil
         }
+        undoManager?.registerUndo(withTarget: self) { _ in restore() }
         undoManager?.setActionName(String(localized: "Delete Script"))
         let title = document.title.isEmpty ? String(localized: "Untitled") : document.title
-        announce(String(localized: "Deleted “\(title)” · ⌘Z to undo"))
+        announce(String(localized: "Deleted “\(title)”"), action: NoticeAction(title: String(localized: "Undo"), run: restore))
+    }
+
+    /// 左边列表里选中的那一项删掉（⌘⌫）。
+    func deleteSidebarSelection() {
+        switch sidebarSelection {
+        case .script(let id): delete(id, undoManager: mainWindow?.undoManager)
+        case .take(let url): trashTake(url)
+        case nil: break
+        }
     }
 
     func duplicate(_ id: UUID) {
@@ -1442,8 +1461,12 @@ final class AppModel: ObservableObject {
                         if let other = self.store.documents.first(where: { $0.id != id })?.id {
                             self.delete(other, undoManager: undo)
                             Log.info("pptx test delete: notice “\(self.notice?.text ?? "")”, \(self.store.documents.count) left")
-                            undo.undo()
-                            Log.info("pptx test delete → undo: \(self.store.documents.count) scripts")
+                            // 等编辑器换完稿子再撤销（以前换稿子会把撤销清空，⌘Z 找不回来）
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                                Log.info("pptx test delete: can undo \(undo.canUndo)")
+                                undo.undo()
+                                Log.info("pptx test delete → undo: \(self.store.documents.count) scripts")
+                            }
                         }
                     }
                     // 左边列表：配了幻灯片的那份有没有第一页的小图
