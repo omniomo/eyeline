@@ -55,6 +55,7 @@
 		DCFFA057889A83905FBA70E7 /* TakeRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79FFD8CAC8A6E1A2A41F1BB7 /* TakeRecorder.swift */; };
 		E9CAEC009E1AA6CA761C9097 /* Tokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7454169E091BBBFB0E41E73B /* Tokenizer.swift */; };
 		EDFEAD1FD1CD648CDF3F08CC /* Tracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669402DD6985A42E6B9AB19F /* Tracker.swift */; };
+		FDD47523BA6821094748069F /* Installer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93772663964E999487AC9A35 /* Installer.swift */; };
 		FF67022437DAFBD0FDE5941F /* RibbonControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5220ABC347CCC9F140AFB7A4 /* RibbonControls.swift */; };
 /* End PBXBuildFile section */
 
@@ -83,6 +84,7 @@
 		79FFD8CAC8A6E1A2A41F1BB7 /* TakeRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeRecorder.swift; sourceTree = "<group>"; };
 		7DB28E274B3278846DEC2688 /* RecordingFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingFrame.swift; sourceTree = "<group>"; };
 		8AF29B5344276214D3BA79EA /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		93772663964E999487AC9A35 /* Installer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Installer.swift; sourceTree = "<group>"; };
 		9BB0F5372620DD221A10E46A /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
 		9E578A27A1C1014ADEDED004 /* SlideImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideImport.swift; sourceTree = "<group>"; };
 		A405D9BAF4B6FFCA90194511 /* RibbonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RibbonView.swift; sourceTree = "<group>"; };
@@ -195,6 +197,7 @@
 			children = (
 				EDD566D3F099F1AD1011346C /* AppModel.swift */,
 				F0B0D3C15E6D88FC6DDA43BC /* EyelineApp.swift */,
+				93772663964E999487AC9A35 /* Installer.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -347,6 +350,7 @@
 				63551720B773D8A81A8F7ADE /* DropFeedback.swift in Sources */,
 				64FB4FBBB43F44BDA1B4061F /* EyelineApp.swift in Sources */,
 				25718C05ABC14CCE5C6E7F0A /* Hotkeys.swift in Sources */,
+				FDD47523BA6821094748069F /* Installer.swift in Sources */,
 				AC87DD4A4FF96ACBFAF790D7 /* Listener.swift in Sources */,
 				1FC21922618F0C07690DFDE4 /* Log.swift in Sources */,
 				5B8D13783D924CD1B787DBDF /* MainView.swift in Sources */,
@@ -465,7 +469,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 88D7C437XC;
@@ -479,8 +483,8 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 0.1.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -546,7 +550,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 88D7C437XC;
@@ -566,8 +570,8 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 0.1.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

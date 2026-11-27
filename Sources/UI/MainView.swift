@@ -27,7 +27,7 @@ struct MainView: View {
         .navigationTitle("")
         // 放幻灯片：侧栏、工具栏都收起来，只剩幻灯片
         .toolbar(model.presenting ? .hidden : .visible, for: .windowToolbar)
-        .onChange(of: model.presenting) { _, presenting in
+        .onChangeOf(model.presenting) { _, presenting in
             if presenting {
                 columnsBeforeShow = columns
                 columns = .detailOnly
@@ -61,6 +61,16 @@ struct MainView: View {
             }
         }
         .animation(.omoOut(0.2), value: model.dragging)
+        // 三步上手：整个窗口暗下来，只留要指的那一块
+        .overlay { CoachMarks(model: model) }
+        // 从 dmg / 「下载」里直接打开的：问一下要不要搬进「应用程序」
+        .overlay {
+            if model.offerMove {
+                MoveToApplicationsCard(model: model)
+                    .shieldsTextCursor("move")
+                    .transition(.opacity)
+            }
+        }
         .onDrop(of: [.fileURL], delegate: WindowDrop(model: model))
         .onAppear { model.openMainWindow = { openWindow(id: "main") } }
     }
@@ -115,7 +125,7 @@ struct Sidebar: View {
             }
             .animation(.omoOut(0.35), value: recorder.takes)
             // 刚录好一条：滚到它那里
-            .onChange(of: recorder.takes.first?.url) { _, url in
+            .onChangeOf(recorder.takes.first?.url) { _, url in
                 if let url { withAnimation(.omoOut(0.35)) { proxy.scrollTo(url) } }
             }
         }
@@ -454,7 +464,7 @@ struct EditorPane: View {
                 if model.showingShots, let anchor = anchors["shot"] {
                     ShotsOverlay(model: model, prefs: prefs, anchor: anchor)
                 }
-                CoachMarks(model: model, anchors: anchors)
+                CoachReporter(model: model, anchors: anchors)
             }
         }
         .animation(.omoOut(0.3), value: model.notice)
@@ -612,7 +622,7 @@ struct PlayButton: View {
                         .font(.system(size: active ? 13 : 15, weight: .semibold))
                         .foregroundStyle(.white)
                         .offset(x: active ? 0 : 1.5)
-                        .contentTransition(.symbolEffect(.replace))
+                        .symbolReplaceTransition()
                 }
             }
             .frame(width: 46, height: 46)

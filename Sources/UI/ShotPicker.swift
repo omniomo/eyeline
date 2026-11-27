@@ -44,7 +44,7 @@ struct ShotButton: View {
                 .foregroundStyle(model.showingShots ? Paper.accent
                                  : shot == nil ? (hovering ? Paper.gray : Paper.fog)
                                  : (hovering ? Paper.ink : Paper.charcoal))
-                .contentTransition(.symbolEffect(.replace))
+                .symbolReplaceTransition()
                 .frame(width: 32, height: 30)
                 .contentShape(Rectangle())
         }

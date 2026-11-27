@@ -30,8 +30,14 @@ final class RibbonView: NSView {
 
     /// 屏幕上字的位置（横向，整行坐标）。每一帧向目标靠一点。
     private var shownX: CGFloat = 0
+    /// 跟读时提词条滑动的速度（弹簧：起步、停下都是缓的）。
+    private var velocity: CGFloat = 0
+    /// 一下子要跳很远（自由发挥完接回稿子、跳过一句、退回句首）：不甩过去，字先淡出，换到新位置再淡入。
+    private var textFade: CGFloat = 1
+    private var fadingTo: CGFloat?
     private var moving = false
-    private var link: CADisplayLink?
+    /// 每帧调一次 step：macOS 14 起用屏幕的 CADisplayLink，13 上用一个 60 帧的 Timer。
+    private var link: AnyObject?
     private var lastFrame: CFTimeInterval = 0
 
     // 出现、收起：从刘海（或者正中）往两边打开。
@@ -65,7 +71,7 @@ final class RibbonView: NSView {
         self.prompter = prompter
         self.geometry = geometry
         rebuildText(force: true)
-        shownX = text?.x(at: prompter.target) ?? 0
+        shownX = text?.x(at: prompter.target) ?? 0; velocity = 0; textFade = 1; fadingTo = nil
         startLink()
         needsDisplay = true
     }
@@ -78,14 +84,14 @@ final class RibbonView: NSView {
     /// 稿子换了（逐字和关键词之间切）：重新排字，直接跳到现在的位置。
     func reload() {
         rebuildText(force: true)
-        if let prompter { shownX = text?.x(at: prompter.target) ?? 0 }
+        if let prompter { shownX = text?.x(at: prompter.target) ?? 0; velocity = 0; textFade = 1; fadingTo = nil }
         needsDisplay = true
     }
 
     func update(geometry: RibbonGeometry) {
         self.geometry = geometry
         rebuildText(force: false)
-        if let prompter { shownX = text?.x(at: prompter.target) ?? 0 }
+        if let prompter { shownX = text?.x(at: prompter.target) ?? 0; velocity = 0; textFade = 1; fadingTo = nil }
         needsDisplay = true
     }
 
@@ -120,19 +126,30 @@ final class RibbonView: NSView {
 
     private func startLink() {
         guard link == nil else { return }
-        let link = displayLink(target: self, selector: #selector(step(_:)))
-        link.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 120, preferred: 60)
-        link.add(to: .main, forMode: .common)
-        self.link = link
+        if #available(macOS 14.0, *) {
+            let link = displayLink(target: self, selector: #selector(tick))
+            link.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 120, preferred: 60)
+            link.add(to: .main, forMode: .common)
+            self.link = link
+        } else {
+            let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.step() }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            self.link = timer
+        }
         lastFrame = 0
     }
 
     private func stopLink() {
-        link?.invalidate()
+        if #available(macOS 14.0, *) { (link as? CADisplayLink)?.invalidate() }
+        (link as? Timer)?.invalidate()
         link = nil
     }
 
-    @objc private func step(_ link: CADisplayLink) {
+    @objc private func tick() { step() }
+
+    private func step() {
         let now = CACurrentMediaTime()
         let dt = lastFrame == 0 ? 1.0 / 60 : min(0.05, now - lastFrame)
         lastFrame = now
@@ -165,8 +182,34 @@ final class RibbonView: NSView {
                         // 匀速：每一帧走一样的距离，不加缓动。
                         shownX = target
                     } else {
-                        shownX += (target - shownX) * CGFloat(1 - exp(-dt / 0.14))
-                        if abs(target - shownX) < 0.05 { shownX = target }
+                        let size = geometry?.fontSize ?? 16
+                        let gap = target - shownX
+                        if fadingTo == nil, abs(gap) > size * 9, prompter.activeMode == .follow, prompter.phase == .running {
+                            fadingTo = target
+                        }
+                        if let destination = fadingTo {
+                            // 淡出 0.12 秒，换位置，再淡入
+                            textFade = max(0, textFade - CGFloat(dt / 0.12))
+                            if textFade == 0 {
+                                shownX = destination
+                                velocity = 0
+                                fadingTo = nil
+                            }
+                        } else {
+                            textFade = min(1, textFade + CGFloat(dt / 0.22))
+                            if prompter.activeMode == .follow {
+                                // 弹簧追上去（不过冲），速度不超过说话速度的两倍多：一次对上好几个字也是平平地滑过去
+                                let omega: CGFloat = 9
+                                velocity += (omega * omega * gap - 2 * omega * velocity) * CGFloat(dt)
+                                let cap = size * max(7, CGFloat(prompter.speechRate) * 2.4)
+                                velocity = max(-cap, min(cap, velocity))
+                                shownX += velocity * CGFloat(dt)
+                                if abs(target - shownX) < 0.05, abs(velocity) < 1 { shownX = target; velocity = 0 }
+                            } else {
+                                shownX += gap * CGFloat(1 - exp(-dt / 0.14))
+                                if abs(target - shownX) < 0.05 { shownX = target }
+                            }
+                        }
                     }
                     moving = abs(shownX - before) > 0.02
                 }
@@ -195,7 +238,8 @@ final class RibbonView: NSView {
     private func updateBackground() {
         guard let background, let geometry else { return }
         let range = openedRange
-        background.isHidden = reveal <= 0.001
+        // 放幻灯片时提词条那一行是黑的（见 SlideShow）：不要玻璃底，字直接浮在黑色上，和屏幕边框连成一片
+        background.isHidden = reveal <= 0.001 || AppModel.shared.presenting
         let frame = NSRect(x: range.left, y: 0, width: max(0, range.right - range.left), height: bounds.height)
         if background.frame != frame { background.frame = frame }
         if maskRadius != geometry.cornerRadius {
@@ -221,6 +265,7 @@ final class RibbonView: NSView {
         // 字先画在一层里，再用一张横向的透明度蒙版：念过的淡、蓝点那里一道缝、两头隐去。
         let anchor = geometry.anchor + textOffset
         let baseline = ((height - (text.ascent + text.descent)) / 2 + text.descent).rounded()
+        context.setAlpha(textFade)
         context.beginTransparencyLayer(auxiliaryInfo: nil)
         context.textMatrix = .identity
         let firstVisible = shownX - anchor
@@ -258,6 +303,7 @@ final class RibbonView: NSView {
         }
         context.setBlendMode(.normal)
         context.endTransparencyLayer()
+        context.setAlpha(1)
 
         if statusAlpha > 0.01 {
             if prompter.isWaitingForVoice {

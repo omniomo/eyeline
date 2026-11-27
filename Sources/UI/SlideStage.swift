@@ -62,19 +62,7 @@ struct SlideStage: View {
         .onHover { inside in withAnimation(.omoOut(0.2)) { hovering = inside } }
         .focusable()
         .focused($focused)
-        .focusEffectDisabled()
-        .onKeyPress(keys: [.leftArrow, .upArrow, .pageUp]) { _ in
-            deck.step(-1)
-            return .handled
-        }
-        .onKeyPress(keys: [.rightArrow, .downArrow, .pageDown, .space]) { _ in
-            deck.step(1)
-            return .handled
-        }
-        .onKeyPress(keys: [.home, .end]) { press in
-            deck.select(press.key == .home ? 1 : deck.pageCount)
-            return .handled
-        }
+        .modifier(SlideKeys(deck: deck))
     }
 
     // MARK: 还没配幻灯片
@@ -204,7 +192,7 @@ private struct Filmstrip: View {
                 .frame(maxHeight: .infinity)
             }
             .onAppear { proxy.scrollTo(deck.page, anchor: .center) }
-            .onChange(of: deck.page) { _, page in
+            .onChangeOf(deck.page) { _, page in
                 withAnimation(.omoOut(0.3)) { proxy.scrollTo(page, anchor: .center) }
             }
         }
@@ -303,8 +291,11 @@ struct SlideShow: View {
         GeometryReader { geometry in
             let top = model.presentationTopInset
             let size = fitted(in: CGSize(width: geometry.size.width, height: geometry.size.height - top))
-            ZStack {
+            ZStack(alignment: .top) {
                 Paper.white
+                // 顶上让给提词条的那一条涂黑：和屏幕的黑边框、提词条连成一片，不留一道白缝
+                // （系统全屏时菜单栏那一行也是黑的）
+                Color.black.frame(height: top)
                 if let image = deck.render(page, fitting: size) {
                     Image(nsImage: image)
                         .resizable()
@@ -326,5 +317,32 @@ struct SlideShow: View {
         return space.width / space.height > aspect
             ? CGSize(width: (space.height * aspect).rounded(), height: space.height)
             : CGSize(width: space.width, height: (space.width / aspect).rounded())
+    }
+}
+
+
+/// 幻灯片上的方向键、空格、Home / End 翻页（macOS 14 起；13 上用菜单和全局快捷键翻）。
+private struct SlideKeys: ViewModifier {
+    @ObservedObject var deck: SlideDeck
+
+    func body(content: Content) -> some View {
+        if #available(macOS 14.0, *) {
+            content
+                .focusEffectDisabled()
+                .onKeyPress(keys: [.leftArrow, .upArrow, .pageUp]) { _ in
+                    deck.step(-1)
+                    return .handled
+                }
+                .onKeyPress(keys: [.rightArrow, .downArrow, .pageDown, .space]) { _ in
+                    deck.step(1)
+                    return .handled
+                }
+                .onKeyPress(keys: [.home, .end]) { press in
+                    deck.select(press.key == .home ? 1 : deck.pageCount)
+                    return .handled
+                }
+        } else {
+            content
+        }
     }
 }

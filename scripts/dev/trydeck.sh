@@ -18,8 +18,8 @@ pkill -x Eyeline && sleep 0.5
 rm -f .dev/deck*.png
 open -n .build/Build/Products/Debug/Eyeline.app --args -storeFolder "$PWD/.dev/teststore" -hideFromCapture NO -recordTakes NO \
   -showSlides YES $(cat .dev/deckargs 2>/dev/null) -deckTest "$pdf" -deckTest2 "$pdf2" -deckShot "$PWD/.dev/deck.png"
-sleep 20
-log show --last 26s --style compact --predicate 'process == "Eyeline"' 2>/dev/null | grep -E "eyeline:app" | grep -iE "deck|slide|start|caption" | cut -c60-420
+sleep 21
+log show --last 27s --style compact --predicate 'process == "Eyeline"' 2>/dev/null | grep -E "eyeline:app" | grep -iE "deck|slide|start|caption|paste" | cut -c60-420
 log show --last 26s --style compact --predicate 'process == "Eyeline"' 2>/dev/null | grep -iE " E | fault" | cut -c1-200 | tail -5
 pgrep -lx Eyeline || echo "not running"
 ls -la .dev/deck*.png

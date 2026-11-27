@@ -1,7 +1,7 @@
 #!/bin/bash
 # 打一个发给别人的 Eyeline：
 #   Release 编译（Apple 芯片和 Intel 都能跑）→ Developer ID 签名（hardened runtime + 时间戳）
-#   → 装进 dmg（把 App 拖进「应用程序」）→ 交给 Apple 公证 → 把公证票据钉在 dmg 上。
+#   → 装进 dmg（窗口里一张背景图，蓝点箭头指着「应用程序」，见 scripts/make-dmg.sh）→ 交给 Apple 公证 → 把公证票据钉在 dmg 上。
 # 结果在 dist/Eyeline-<版本>.dmg。加 --publish 再发到 GitHub Release（omniomo/eyeline）。
 #
 # 第一次用之前（各做一次）：
@@ -33,7 +33,7 @@ if ! xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null; then
   echo "无法使用公证凭据「${PROFILE}」，请检查上方的 Apple 错误。"; exit 1
 fi
 
-step "编译 $VERSION（Release，arm64 + x86_64）"
+step "编译 ${VERSION}（Release，arm64 + x86_64）"
 mkdir -p .dev
 xcodegen generate --quiet
 xcodebuild -project Eyeline.xcodeproj -scheme Eyeline -configuration Release -derivedDataPath "$BUILD" \
@@ -57,8 +57,7 @@ STAGE=$WORK/stage
 IMAGE=$WORK/$(basename "$DMG")
 mkdir "$STAGE"
 cp -R "$APP" "$STAGE/"
-ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "Eyeline" -srcfolder "$STAGE" -format UDZO "$IMAGE" >/dev/null
+bash scripts/make-dmg.sh "$STAGE/Eyeline.app" "$IMAGE"
 codesign --sign "$IDENTITY" --timestamp "$IMAGE"
 
 step "公证（一般几分钟）"
@@ -79,5 +78,5 @@ ls -lh "$DMG"
 
 if [ "${1:-}" = "--publish" ]; then
   step "发到 GitHub Release（$REPO v$VERSION）"
-  gh release create "v$VERSION" "$DMG" --repo "$REPO" --title "Eyeline $VERSION" --notes "macOS 14 及以上，Apple 芯片和 Intel 都能用。下载 dmg，把 Eyeline 拖进「应用程序」。"
+  gh release create "v$VERSION" "$DMG" --repo "$REPO" --title "Eyeline $VERSION" --notes "macOS 13 及以上，Apple 芯片和 Intel 都能用。下载 dmg，把 Eyeline 拖进「应用程序」。"
 fi

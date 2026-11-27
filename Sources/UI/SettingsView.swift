@@ -10,6 +10,8 @@ struct SettingsView: View {
     @State private var languageChanged = false
     /// 识别语言的下拉开着。
     @State private var languageMenu = false
+    /// 登录时打开：读系统里的真实状态（默认没加进登录项）。
+    @State private var openAtLogin = LoginItem.isOn
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -25,6 +27,9 @@ struct SettingsView: View {
                     SettingsRow(String(localized: "Takes effect after Eyeline reopens"), secondary: true) {
                         PillButton(title: String(localized: "Reopen Now")) { AppLanguage.relaunch() }
                     }
+                }
+                SettingsRow(String(localized: "Open at login")) {
+                    Switch(isOn: $openAtLogin)
                 }
                 SettingsRow(String(localized: "Keyboard shortcuts"), last: true) {
                     PillButton(title: String(localized: "Show")) { openShortcuts() }
@@ -88,13 +93,18 @@ struct SettingsView: View {
                 .contentShape(Rectangle())
                 .onTapGesture { if languageMenu { withAnimation(.omoOut(0.2)) { languageMenu = false } } }
         }
-        .onChange(of: appLanguage) { _, language in
+        .onChangeOf(openAtLogin) { _, on in
+            guard on != LoginItem.isOn else { return }
+            LoginItem.set(on)
+            openAtLogin = LoginItem.isOn
+        }
+        .onChangeOf(appLanguage) { _, language in
             language.apply()
             withAnimation(.omoOut(0.25)) { languageChanged = language != AppLanguage.launched }
         }
-        .onChange(of: prefs.size) { onRibbonChange() }
-        .onChange(of: prefs.display) { onRibbonChange() }
-        .onChange(of: prefs.hideFromCapture) { onRibbonChange() }
+        .onChangeOf(prefs.size) { _, _ in onRibbonChange() }
+        .onChangeOf(prefs.display) { _, _ in onRibbonChange() }
+        .onChangeOf(prefs.hideFromCapture) { _, _ in onRibbonChange() }
         .preferredColorScheme(.light)
     }
 }

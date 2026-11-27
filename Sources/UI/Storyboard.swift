@@ -47,23 +47,23 @@ struct Storyboard: View {
                 .padding(.top, 28)
                 .padding(.bottom, 120)
             }
-            .onChange(of: model.pageFocus?.serial) { _, _ in
+            .onChangeOf(model.pageFocus?.serial) { _, _ in
                 // 先确保那一页排出来了（看得见就不动）；光标放进去以后，台词框自己滚到看得见（见 CaptionScrollView.reveal）
                 guard let focus = model.pageFocus else { return }
                 proxy.scrollTo(focus.page)
             }
-            .onChange(of: active) { _, page in
+            .onChangeOf(active) { _, page in
                 guard prompting else { return }
                 withAnimation(.omoOut(0.4)) { proxy.scrollTo(page, anchor: .top) }
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .simultaneousGesture(
-            MagnifyGesture()
-                .onChanged { value in
+            MagnificationGesture()   // macOS 13 也有；14 起的 MagnifyGesture 一样用
+                .onChanged { magnification in
                     let start = pinchStart ?? prefs.zoom
                     pinchStart = start
-                    prefs.setZoom(start * value.magnification)
+                    prefs.setZoom(start * magnification)
                 }
                 .onEnded { _ in pinchStart = nil })
         .background(Paper.haze)
@@ -282,12 +282,17 @@ struct PageTextView: NSViewRepresentable {
         view.onLeave = { onLeave($0) }
         view.onSpread = { onSpread($0, $1, $2) }
         // 外面改了这一页（幻灯片改了、全文里改了）才换掉；自己刚打的字不换（打到一半的换行之类）
-        if text != coordinator.known {
+        if text != coordinator.known, !view.hasMarkedText() {
             coordinator.known = text
             if view.string != text {
+                // 外面改了这一页：换掉，光标留在原来的地方
+                let selection = view.selectedRange()
+                defer { view.setSelectedRange(NSRange(location: min(selection.location, (view.string as NSString).length), length: 0)) }
                 coordinator.applying = true
                 view.string = text
                 view.restyle()
+                // 排好版再画：不然画的时候才排、框跟着变高，SwiftUI 又得重新排一遍
+                if let container = view.textContainer { view.layoutManager?.ensureLayout(for: container) }
                 coordinator.applying = false
             }
         }
@@ -324,8 +329,10 @@ struct PageTextView: NSViewRepresentable {
         init(_ parent: PageTextView) { self.parent = parent }
 
         func textDidChange(_ notification: Notification) {
-            guard !applying, let view = notification.object as? RowTextView else { return }
+            // 输入法还在组字：等字定下来再交给外面（见 ScriptEditor）
+            guard !applying, let view = notification.object as? RowTextView, !view.hasMarkedText() else { return }
             view.restyle()
+            if let container = view.textContainer { view.layoutManager?.ensureLayout(for: container) }
             // 回车出来的空行不会存进稿子（外面的字没变，不会重新排版），自己叫外面重新量一下高度
             view.enclosingScrollView?.invalidateIntrinsicContentSize()
             view.revealCaret()
@@ -335,7 +342,7 @@ struct PageTextView: NSViewRepresentable {
 
         func textViewDidChangeSelection(_ notification: Notification) {
             guard !applying, let view = notification.object as? NSTextView, view.window?.firstResponder === view,
-                  view.selectedRange().location != reported else { return }
+                  !view.hasMarkedText(), view.selectedRange().location != reported else { return }
             reported = view.selectedRange().location
             parent.onCaret(view.selectedRange().location)
         }
@@ -382,6 +389,9 @@ final class CaptionScrollView: NSScrollView {
 }
 
 final class RowTextView: NSTextView {
+    // 右键菜单只留剪切、拷贝、粘贴：系统那一长串（写作工具、自动填充、服务、语音……）用不上
+    override func menu(for event: NSEvent) -> NSMenu? { TextMenu.make() }
+
     // 鼠标：只在看得见字、没被盖住的地方是 I 形；底栏、面板、回放盖着的地方是箭头（见 TextCursor）
     override func resetCursorRects() {
         for rect in TextCursor.rects(in: self) { addCursorRect(rect, cursor: .iBeam) }
@@ -408,7 +418,7 @@ final class RowTextView: NSTextView {
     var onSpread: ((String, NSRange, UndoManager?) -> Bool)?
     private var shownProgress: Int?
 
-    /// 粘贴一整篇稿子（段落之间空一行）：第一段进这一行，后面的一段一页往下填。
+    /// 粘贴：话都进这一行。带空行的一大段，下面会问要不要按空行分到后面几页（见 AppModel.pastePages）。
     override func paste(_ sender: Any?) {
         if spreadPaste() { return }
         super.paste(sender)
@@ -454,17 +464,34 @@ final class RowTextView: NSTextView {
     }
 
     /// 这么宽的时候要多高。
+    /// 用一套单独的排版来量，不动正在显示的这一套：量的时候改了它的宽，画的时候它会自己改大小，
+    /// SwiftUI 跟着再排一遍又来量……大段粘贴时停不下来，AppKit 直接退出。
     func height(forWidth width: CGFloat) -> CGFloat {
-        guard let layoutManager, let textContainer else { return 24 }
-        textContainer.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
-        layoutManager.ensureLayout(for: textContainer)
-        let line = ceil(rowFont.ascender - rowFont.descender + rowFont.leading) * 1.38
+        let line = ceil(ceil(rowFont.ascender - rowFont.descender + rowFont.leading) * 1.38)
+        guard let storage = textStorage else { return line }
+        let key = Measure(text: storage.string, width: width, fontSize: fontSize)
+        if let measured, measured.key == key { return measured.height }
+        let copy = NSTextStorage(attributedString: storage)
+        let manager = NSLayoutManager()
+        let container = NSTextContainer(size: NSSize(width: max(1, width), height: .greatestFiniteMagnitude))
+        container.lineFragmentPadding = textContainer?.lineFragmentPadding ?? 0
+        manager.addTextContainer(container)
+        copy.addLayoutManager(manager)
+        manager.ensureLayout(for: container)
         // 末尾刚回车出来的空行（光标在那儿）也要算上高度，不然光标掉到框外面
-        var used = layoutManager.usedRect(for: textContainer).maxY
-        let extra = layoutManager.extraLineFragmentRect
+        var used = manager.usedRect(for: container).maxY
+        let extra = manager.extraLineFragmentRect
         if !extra.isEmpty { used = max(used, extra.maxY) }
-        return max(ceil(line), ceil(used))
+        let height = max(line, ceil(used))
+        measured = (key, height)
+        return height
     }
+    private struct Measure: Equatable {
+        let text: String
+        let width: CGFloat
+        let fontSize: CGFloat
+    }
+    private var measured: (key: Measure, height: CGFloat)?
 
     /// 光标那一行露出来：框里字多到要滚时在框里滚；框本身被挡住了，外面的分镜表也滚过来。
     func revealCaret() {

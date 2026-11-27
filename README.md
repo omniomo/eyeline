@@ -13,7 +13,7 @@
 
 ## Install
 
-Download the dmg from the [latest release](https://github.com/omniomo/eyeline/releases/latest) and drag Eyeline into Applications. macOS 14 or later, Apple silicon and Intel.
+Download the dmg from the [latest release](https://github.com/omniomo/eyeline/releases/latest) and drag Eyeline into Applications. macOS 13 or later, Apple silicon and Intel.
 
 ## Privacy
 

@@ -109,6 +109,7 @@ private final class ControlsPanel: NSPanel {
         backgroundColor = .clear
         isOpaque = false
         hasShadow = false
+        appearance = NSAppearance(named: .darkAqua)
         hidesOnDeactivate = false
         isMovable = false
         isReleasedWhenClosed = false
@@ -154,11 +155,13 @@ struct RibbonToolbar: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 5)
+        // 和提词条一样是深色的玻璃：下面是白的（浏览器、文档）也看得清白色的图标
+        .background(RoundedRectangle(cornerRadius: 19, style: .continuous).fill(Color.black.opacity(0.42)))
         .glass(cornerRadius: 19)
         .environment(\.colorScheme, .dark)
         .fixedSize()
         .onHover(perform: onHover)
-        .onChange(of: speed) { _, _ in onLayout() }
+        .onChangeOf(speed) { _, _ in onLayout() }
     }
 
     private var divider: some View {

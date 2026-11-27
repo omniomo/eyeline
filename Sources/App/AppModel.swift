@@ -141,7 +141,7 @@ final class AppModel: ObservableObject {
         guard let window = hiddenWindow else { return }
         hiddenWindow = nil
         window.makeKeyAndOrderFront(nil)
-        NSApp.activate()
+        NSApp.bringToFront()
     }
     private var countdownWork: DispatchWorkItem?
     /// 倒数完要做的：真的开始录。
@@ -242,7 +242,7 @@ final class AppModel: ObservableObject {
     private func screenPermissionGranted() {
         dismissScreenPermission()
         openMainWindow?()
-        NSApp.activate()
+        NSApp.bringToFront()
         announce(String(localized: "Screen recording is allowed"))
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.play() }
     }
@@ -268,6 +268,22 @@ final class AppModel: ObservableObject {
 
     /// 三步上手现在在第几步（nil：没在看）。第一次打开时自动出来，菜单「帮助 › 快速上手」再看一遍。
     @Published var coachStep: Int?
+    /// 从 dmg / 「下载」里直接打开的：窗口里问一下要不要搬进「应用程序」。
+    @Published var offerMove = false
+
+    func moveToApplications() {
+        if !Installer.moveAndRelaunch() {
+            withAnimation(.omoOut(0.25)) { offerMove = false }
+            announce(String(localized: "Couldn’t move Eyeline — drag it into Applications"), problem: true)
+        }
+    }
+
+    func declineMove() {
+        Installer.decline()
+        withAnimation(.omoOut(0.25)) { offerMove = false }
+    }
+    /// 这一步要指的东西在窗口里的位置（右边那一栏量好了报上来）。
+    @Published var coachHole: CGRect?
 
     func startQuickStart() { coachStep = 0 }
 
@@ -281,6 +297,7 @@ final class AppModel: ObservableObject {
 
     func endQuickStart() {
         coachStep = nil
+        coachHole = nil
         UserDefaults.standard.set(true, forKey: "quickStartDone")
     }
 
@@ -304,7 +321,16 @@ final class AppModel: ObservableObject {
         var text: String
         var busy = false
         var problem = false
+        /// 句子后面一个可以点的字（比如「按空行分成 3 页」）。
+        var action: NoticeAction?
         var id = UUID()
+        static func == (a: Notice, b: Notice) -> Bool {
+            a.id == b.id && a.text == b.text && a.busy == b.busy && a.problem == b.problem && a.action?.title == b.action?.title
+        }
+    }
+    struct NoticeAction {
+        let title: String
+        let run: () -> Void
     }
     @Published private(set) var notice: Notice?
     /// 让编辑器把光标挪到某处（top：把那一行滚到最上面）。
@@ -345,8 +371,29 @@ final class AppModel: ObservableObject {
             }
         }
         // 第一次打开：三步上手（测试用的单独稿子库里不出来）
-        if !UserDefaults.standard.bool(forKey: "quickStartDone"), UserDefaults.standard.string(forKey: "storeFolder") == nil {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in self?.startQuickStart() }
+        // `-coachStep 1`：直接停在三步上手的某一步（截图看样子用）
+        if UserDefaults.standard.object(forKey: "coachStep") != nil {
+            let step = UserDefaults.standard.integer(forKey: "coachStep")
+            Log.info("coach test: step \(step)")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.coachStep = step }
+            if let shot = UserDefaults.standard.string(forKey: "coachShot") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.shootWindow(to: URL(fileURLWithPath: shot)) }
+            }
+        }
+        // 不在「应用程序」里、而且现在哪里都搜不到它（直接从 dmg 里打开的）：问一下要不要搬过去。
+        // 不用问的话，第一次打开就是三步上手。
+        Installer.decideOffer { [weak self] offer in
+            guard let self else { return }
+            if offer {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    withAnimation(.omoOut(0.3)) { self.offerMove = true }
+                }
+                if let shot = UserDefaults.standard.string(forKey: "moveShot") {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.shootWindow(to: URL(fileURLWithPath: shot)) }
+                }
+            } else if !UserDefaults.standard.bool(forKey: "quickStartDone"), UserDefaults.standard.string(forKey: "storeFolder") == nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { self.startQuickStart() }
+            }
         }
         // 放幻灯片放到一半退出：先把窗口还原，下次打开还是原来的大小
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
@@ -416,7 +463,7 @@ final class AppModel: ObservableObject {
         recorder.onFinished = { [weak self] _ in
             self?.hiddenWindow = nil
             self?.openMainWindow?()
-            NSApp.activate()
+            NSApp.bringToFront()
         }
         // 倒数的时候按空格（⌥空格）：马上开始
         prompter.onStartNow = { [weak self] in self?.finishCountdown() }
@@ -514,7 +561,15 @@ final class AppModel: ObservableObject {
         }
         guard let document, !starting else { return }
         recorder.dismiss()
-        let offset = fromBeginning ? 0 : cursor
+        var offset = fromBeginning ? 0 : cursor
+        // 配了幻灯片：光标停在某一页的话末尾（刚导入、刚粘贴完、点进那一行时都会这样），这一页就没得念了，
+        // 一开始就停在页末等翻页。这时从这一页开头念。停在一页中间（上次念到这里）照旧接着念。
+        if showsStoryboard, !fromBeginning {
+            let page = paged.number(at: offset)
+            let start = paged.start(ofPage: page)
+            let length = (paged.text(ofPage: page) as NSString).length
+            if length > 0, offset >= start + length { offset = start }
+        }
         guard let shot, canPlay else {
             prompter.start(document, fromRaw: offset)
             return
@@ -739,11 +794,11 @@ final class AppModel: ObservableObject {
     }
 
     /// 在窗口上方说一句。不是 busy 的话，过一会儿自己消失。
-    func announce(_ text: String, busy: Bool = false, problem: Bool = false) {
-        let notice = Notice(text: text, busy: busy, problem: problem)
+    func announce(_ text: String, busy: Bool = false, problem: Bool = false, action: NoticeAction? = nil) {
+        let notice = Notice(text: text, busy: busy, problem: problem, action: action)
         self.notice = notice
         guard !busy else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + (problem ? 4 : 2.6)) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + (action != nil ? 7 : problem ? 4 : 2.6)) { [weak self] in
             if self?.notice?.id == notice.id { self?.notice = nil }
         }
     }
@@ -764,16 +819,26 @@ final class AppModel: ObservableObject {
                                    titleVisibility: NSWindow.TitleVisibility, fullSize: Bool,
                                    options: NSApplication.PresentationOptions)?
 
-    /// 放映时屏幕顶上让给提词条的那一条有多高（刘海 / 菜单栏）。
+    /// 放映时屏幕顶上让给提词条的那一条有多高：菜单栏那一行；有刘海时提词条挂在刘海下面，一直让到它下面。
     var presentationTopInset: CGFloat {
-        let screen = mainWindow?.screen ?? NSScreen.main
-        return max(screen?.safeAreaInsets.top ?? 0, NSStatusBar.system.thickness)
+        guard let screen = mainWindow?.screen ?? NSScreen.main else { return NSStatusBar.system.thickness }
+        return topInset(on: screen)
+    }
+
+    private func topInset(on screen: NSScreen) -> CGFloat {
+        var top = max(screen.safeAreaInsets.top, NSStatusBar.system.thickness)
+        let ribbonScreen = RibbonGeometry.screen(for: prefs.display)
+        if ribbonScreen == screen {
+            let ribbon = RibbonGeometry.make(screen: screen, size: prefs.size, left: prefs.ribbonLeft, right: prefs.ribbonRight)
+            top = max(top, (screen.frame.maxY - ribbon.frame.minY).rounded(.up) + (ribbon.cornerRadius > 0 ? 4 : 0))
+        }
+        return top
     }
 
     /// 放映时幻灯片在屏幕上的位置（AppKit 全局坐标）：整块屏幕顶上让出提词条那一条，剩下的按幻灯片的比例放到最大、居中。
     /// 录屏幕时录的就是这一块（不带上下的白边）。
     func presentedSlide(on screen: NSScreen) -> CGRect {
-        let top = max(screen.safeAreaInsets.top, NSStatusBar.system.thickness)
+        let top = topInset(on: screen)
         let area = CGRect(x: screen.frame.minX, y: screen.frame.minY, width: screen.frame.width, height: screen.frame.height - top)
         return Composition.fit(aspect: deck.aspect, in: area)
     }
@@ -894,14 +959,27 @@ final class AppModel: ObservableObject {
         if updated != document.text { store.update(document.id, text: updated) }
     }
 
-    /// 分镜表里往第 n 页那一行粘贴了一整篇（带空行）：空一行就到下一页。能撤销。粘贴的不是这种就返回 false，照普通粘贴。
+    /// 分镜表里往第 n 页那一行粘贴：话都进这一页（中间的空行去掉），在哪粘就在哪。
+    /// 粘的是带空行的一大段（可能是一整篇稿子）：下面问一句要不要按空行分到后面几页，点了才分，⌘Z 能撤回。
+    /// 返回 false：照普通粘贴。
     func pastePages(_ pasted: String, intoPage n: Int, replacing selection: NSRange, undo: UndoManager?) -> Bool {
         guard let document, !promptingSelection,
-              let result = paged.pasting(pasted, intoPage: n, replacing: selection) else { return false }
-        replaceText(document.id, with: result.text, undo: undo)
-        if deck.isLoaded { deck.go(to: min(result.page, deck.pageCount)) }
-        requestPageFocus(result.page, atEnd: true)
-        return true
+              let spread = paged.pasting(pasted, intoPage: n, replacing: selection) else { return false }
+        let id = document.id
+        let count = spread.page - n + 1
+        // 先照普通粘贴进这一页；粘完记下那时的原文，点「分页」的时候原文没再改过才分
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard let self, let after = self.store.documents.first(where: { $0.id == id })?.text else { return }
+            let split = NoticeAction(title: String(localized: "Split into \(count) slides")) { [weak self] in
+                guard let self, self.store.documents.first(where: { $0.id == id })?.text == after else { return }
+                self.notice = nil
+                self.replaceText(id, with: spread.text, undo: undo)
+                if self.deck.isLoaded { self.deck.go(to: min(spread.page, self.deck.pageCount)) }
+                self.requestPageFocus(spread.page, atEnd: true)
+            }
+            self.announce(String(localized: "Pasted into this slide"), action: split)
+        }
+        return false
     }
 
     private func replaceText(_ id: UUID, with text: String, undo: UndoManager?) {
@@ -1163,6 +1241,15 @@ final class AppModel: ObservableObject {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 6.7) { [weak self] in
                 self?.ribbon.snapshot(to: URL(fileURLWithPath: shot.replacingOccurrences(of: ".png", with: "-3.png")))
+            }
+        }
+        // `-dumpMenus YES`：打开一秒后把菜单栏每个菜单里有哪些项记到日志里（看系统塞的东西拿掉没有）。
+        if UserDefaults.standard.bool(forKey: "dumpMenus") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                MenuTrim.trimMainMenu()
+                for menu in NSApp.mainMenu?.items ?? [] {
+                    Log.info("menu \(menu.title): \((menu.submenu?.items ?? []).map { $0.isSeparatorItem ? "—" : $0.title }.joined(separator: " | "))")
+                }
             }
         }
         // `-showTake switch`：回放一条，再换到另一条：换完以后回放上面还得是箭头（旧的那块淡出时不能把新的挡板撤了）。
@@ -1630,6 +1717,18 @@ extension AppModel {
                     self.prefs.autoTurnSlides = saved.autoTurn
                 }
             }),
+            // 往一页里粘一大段带空行的话（和粘贴走同一条路：先问要不要分页，再照普通粘贴插进去）：不能崩
+            (18.2, {
+                guard let row = self.mainWindow?.contentView?.allDescendants(of: RowTextView.self).first(where: { $0.isEditable }) else {
+                    Log.info("deck test paste: no row"); return
+                }
+                let block = "2026 年，我紧紧围绕「吃好、睡好、让人类爱上我」三大战略目标，开展了大量工作。\n核心业绩：\n\n* 吃饭：准时到岗，从不缺席\n* 睡觉：见缝插针，全年无休\n* 可爱：稳定输出，偶有超常发挥\n* 陪伴人类：保持距离，适当出现\n"
+                self.mainWindow?.makeFirstResponder(row)
+                row.setSelectedRange(NSRange(location: (row.string as NSString).length, length: 0))
+                _ = row.onSpread?(block, row.selectedRange(), row.undoManager)
+                row.insertText(block, replacementRange: row.selectedRange())
+            }),
+            (19.6, { pages("after pasting a block with blank lines (still running)") }),
         ]
         for (delay, action) in steps { DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: action) }
     }

@@ -269,7 +269,7 @@ struct HoverTip: View {
 
 // MARK: - 第一次打开：三步上手
 
-/// 要指给人看的几处（稿子、走字方式、播放）在哪：一层层报上来，最上面画提示。
+/// 要指给人看的几处（稿子、走字方式、播放）在哪：一层层报上来。
 struct CoachAnchors: PreferenceKey {
     static var defaultValue: [String: Anchor<CGRect>] = [:]
     static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
@@ -283,11 +283,34 @@ extension View {
     }
 }
 
-/// 三步：在哪写稿子、选一种走字方式、怎么开始和停。每一步一句话，要指的东西外面绕一圈淡蓝。
-/// 点一下、按任意键到下一步；Esc 跳过。
-struct CoachMarks: View {
+/// 在右边那一栏里量出这一步要指的东西在窗口里的位置，交给整个窗口上面那层（CoachMarks）去画。
+struct CoachReporter: View {
     @ObservedObject var model: AppModel
     let anchors: [String: Anchor<CGRect>]
+
+    var body: some View {
+        GeometryReader { geometry in
+            let rect = target(in: geometry)
+            Color.clear
+                .onAppear { model.coachHole = rect }
+                .onChangeOf(rect) { _, new in model.coachHole = new }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func target(in geometry: GeometryProxy) -> CGRect? {
+        guard let index = model.coachStep, index < CoachMarks.steps.count,
+              let anchor = anchors[CoachMarks.steps[index].key] else { return nil }
+        let origin = geometry.frame(in: .global).origin
+        return geometry[anchor].offsetBy(dx: origin.x, dy: origin.y)
+    }
+}
+
+/// 三步：在哪写稿子、选一种走字方式、怎么开始和停。
+/// 整个窗口暗下来，只留要指的那一块亮着、外面一圈主色；旁边一张白卡片写一句话，点「下一步」。
+/// 点哪里、按任意键都到下一步；Esc 跳过。
+struct CoachMarks: View {
+    @ObservedObject var model: AppModel
 
     enum Placement { case center, above, aboveTrailing }
 
@@ -299,69 +322,164 @@ struct CoachMarks: View {
 
     var body: some View {
         GeometryReader { geometry in
-            if let index = model.coachStep, index < CoachMarks.steps.count,
-               let anchor = anchors[CoachMarks.steps[index].key] {
+            let origin = geometry.frame(in: .global).origin
+            if let index = model.coachStep, index < CoachMarks.steps.count, let global = model.coachHole {
                 let step = CoachMarks.steps[index]
-                let rect = geometry[anchor]
+                let target = global.offsetBy(dx: -origin.x, dy: -origin.y)
+                let center = step.placement == .center
+                let hole = center ? target.insetBy(dx: 16, dy: 16) : target.insetBy(dx: -8, dy: -6)
+                let radius: CGFloat = center ? 20 : 14
                 ZStack(alignment: .topLeading) {
-                    Color.black.opacity(0.001)
+                    Spotlight(hole: hole, radius: radius)
+                        .fill(Color.black.opacity(0.48), style: FillStyle(eoFill: true))
                         .contentShape(Rectangle())
                         .onTapGesture { model.nextCoachStep() }
                         .shieldsTextCursor("coach")
-                    if step.placement != .center {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(Paper.blue.opacity(0.65), lineWidth: 2)
-                            .frame(width: rect.width + 14, height: rect.height + 10)
-                            .position(x: rect.midX, y: rect.midY)
-                            .allowsHitTesting(false)
-                    }
-                    bubble(index: index, text: step.text)
-                        .modifier(Placed(placement: step.placement, rect: rect, size: geometry.size))
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(Paper.accent, lineWidth: 2)
+                        .shadow(color: Paper.accent.opacity(0.6), radius: 12)
+                        .frame(width: hole.width, height: hole.height)
+                        .position(x: hole.midX, y: hole.midY)
+                        .allowsHitTesting(false)
+                    card(index: index, text: step.text)
+                        .modifier(Placed(placement: step.placement, hole: hole, size: geometry.size))
+                        .id(index)
+                        .transition(.opacity.combined(with: .offset(y: 8)))
                 }
-                .id(index)
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
                 .transition(.opacity)
             }
         }
-        .animation(.omoOut(0.25), value: model.coachStep)
+        .ignoresSafeArea()
+        .animation(.omoOut(0.35), value: model.coachStep)
+        .animation(.omoOut(0.35), value: model.coachHole)
     }
 
-    private func bubble(index: Int, text: String) -> some View {
-        HStack(spacing: 12) {
+    /// 一张白卡片：一句话；下面是第几步，和「下一步」（最后一步是「知道了」）。
+    private func card(index: Int, text: String) -> some View {
+        let last = index + 1 == CoachMarks.steps.count
+        return VStack(alignment: .leading, spacing: 16) {
             Text(text)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Paper.ink)
-            HStack(spacing: 4) {
-                ForEach(0..<CoachMarks.steps.count, id: \.self) { dot in
-                    Circle().fill(dot == index ? Paper.accent : Paper.fog.opacity(0.6)).frame(width: 5, height: 5)
+            HStack(spacing: 0) {
+                HStack(spacing: 5) {
+                    ForEach(0..<CoachMarks.steps.count, id: \.self) { dot in
+                        Capsule()
+                            .fill(dot == index ? Paper.accent : Paper.fog.opacity(0.45))
+                            .frame(width: dot == index ? 14 : 6, height: 6)
+                    }
                 }
+                Spacer(minLength: 28)
+                Button { model.nextCoachStep() } label: {
+                    Text(last ? LocalizedStringKey("Got it") : LocalizedStringKey("Next"))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 15)
+                        .padding(.vertical, 7)
+                        .background(Capsule().fill(Paper.accentFill))
+                        .shadow(color: Paper.accent.opacity(0.35), radius: 6, y: 2)
+                }
+                .buttonStyle(PressStyle())
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 11)
-        .glass(cornerRadius: 16)
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+        .padding(.bottom, 16)
+        .frame(minWidth: 280, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.white))
+        .shadow(color: .black.opacity(0.25), radius: 28, y: 12)
         .fixedSize()
-        .allowsHitTesting(false)
     }
 
-    /// 提示放哪：区域正中，或者要指的东西上面（居中 / 右边对齐）。
+    /// 暗下来的一层：整块，中间挖掉要指的那一块（换一步时，挖掉的地方滑过去）。
+    struct Spotlight: Shape {
+        var hole: CGRect
+        var radius: CGFloat
+
+        var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
+            get { AnimatablePair(AnimatablePair(hole.minX, hole.minY), AnimatablePair(hole.width, hole.height)) }
+            set { hole = CGRect(x: newValue.first.first, y: newValue.first.second, width: newValue.second.first, height: newValue.second.second) }
+        }
+
+        func path(in rect: CGRect) -> Path {
+            var path = Path(rect)
+            path.addRoundedRect(in: hole, cornerSize: CGSize(width: radius, height: radius), style: .continuous)
+            return path
+        }
+    }
+
+    /// 卡片放哪：亮着的那块正中，或者它上面（居中 / 右边对齐）。
     private struct Placed: ViewModifier {
         let placement: Placement
-        let rect: CGRect
+        let hole: CGRect
         let size: CGSize
 
         func body(content: Content) -> some View {
             switch placement {
             case .center:
-                content.frame(width: size.width, height: max(0, rect.midY * 2 - 80), alignment: .center)
+                content
+                    .frame(width: hole.width, height: hole.height, alignment: .center)
+                    .offset(x: hole.minX, y: hole.minY)
             case .above:
-                content.frame(width: max(0, min(size.width, rect.midX * 2)), height: max(0, rect.minY - 16), alignment: .bottom)
+                content.frame(width: max(0, min(size.width, hole.midX * 2)), height: max(0, hole.minY - 14), alignment: .bottom)
             case .aboveTrailing:
-                content.frame(width: max(0, rect.maxX + 6), height: max(0, rect.minY - 16), alignment: .bottomTrailing)
+                content.frame(width: max(0, hole.maxX), height: max(0, hole.minY - 14), alignment: .bottomTrailing)
             }
         }
     }
 }
 
+
+// MARK: - macOS 13 也能跑：14 才有的几个 API，13 上换个写法
+
+extension View {
+    /// onChange，新旧两个值都给。macOS 14 起用系统的；13 上自己记着上一次的值。
+    @ViewBuilder
+    func onChangeOf<V: Equatable>(_ value: V, _ action: @escaping (_ old: V, _ new: V) -> Void) -> some View {
+        if #available(macOS 14.0, *) {
+            onChange(of: value, action)
+        } else {
+            modifier(OldOnChange(value: value, action: action))
+        }
+    }
+
+    /// SF Symbol 换图时的过渡（macOS 14 起才有；13 上直接换）。
+    @ViewBuilder
+    func symbolReplaceTransition() -> some View {
+        if #available(macOS 14.0, *) {
+            contentTransition(.symbolEffect(.replace))
+        } else {
+            self
+        }
+    }
+}
+
+private struct OldOnChange<V: Equatable>: ViewModifier {
+    let value: V
+    let action: (V, V) -> Void
+    @State private var last: V?
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { last = value }
+            .onChange(of: value) { new in
+                action(last ?? new, new)
+                last = new
+            }
+    }
+}
+
+extension NSApplication {
+    /// 把 App 拿到最前面（macOS 14 起的 activate()；13 上用旧的那个）。
+    func bringToFront() {
+        if #available(macOS 14.0, *) {
+            activate()
+        } else {
+            activate(ignoringOtherApps: true)
+        }
+    }
+}
 
 // MARK: - 自己画的控件（不用系统的）
 
@@ -385,6 +503,12 @@ struct Spinner: View {
 
 /// 开关：开是主色，关是浅灰，白色的小圆点滑过去。
 struct Switch: View {
+    /// 读屏软件把它当开关读（.isToggle 是 macOS 14 起才有的；13 上当按钮）。
+    static var toggleTrait: AccessibilityTraits {
+        if #available(macOS 14.0, *) { return .isToggle }
+        return .isButton
+    }
+
     @Binding var isOn: Bool
 
     var body: some View {
@@ -405,7 +529,7 @@ struct Switch: View {
             .contentShape(Capsule())
         }
         .buttonStyle(PressStyle())
-        .accessibilityAddTraits(.isToggle)
+        .accessibilityAddTraits(Switch.toggleTrait)
         .accessibilityValue(isOn ? Text("On") : Text("Off"))
     }
 }
@@ -624,5 +748,17 @@ struct HeaderButton: View {
         .onHover { hovering = $0 }
         .hoverTip(help)
         .accessibilityLabel(help)
+    }
+}
+
+
+/// 文字框的右键菜单：剪切、拷贝、粘贴。
+enum TextMenu {
+    static func make() -> NSMenu {
+        let menu = NSMenu()
+        menu.addItem(withTitle: String(localized: "Cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: String(localized: "Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: String(localized: "Paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "")
+        return menu
     }
 }

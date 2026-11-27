@@ -97,11 +97,20 @@ struct NoticeBanner: View {
                 .font(.system(size: 13))
                 .foregroundStyle(Paper.charcoal)
                 .lineLimit(1)
+            if let action = notice.action {
+                Button(action.title) { action.run() }
+                    .buttonStyle(PressStyle())
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Paper.accentText)
+                    .padding(.leading, 2)
+            }
         }
         .padding(.leading, 13)
         .padding(.trailing, 16)
         .padding(.vertical, 9)
         .glass(cornerRadius: 18)
-        .allowsHitTesting(false)
+        // 有可以点的字才接鼠标（也不让下面文字框的 I 形光标露出来）
+        .background { if notice.action != nil { Color.clear.shieldsTextCursor("notice") } }
+        .allowsHitTesting(notice.action != nil)
     }
 }

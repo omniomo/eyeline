@@ -119,7 +119,7 @@ struct TakeOverlay: View {
                         .foregroundStyle(.white)
                         .frame(width: 34, height: 34)
                         .background(Circle().fill(Paper.accentFill))
-                        .contentTransition(.symbolEffect(.replace))
+                        .symbolReplaceTransition()
                 }
                 .buttonStyle(PressStyle())
                 .help(playback.playing ? String(localized: "Pause  Space") : String(localized: "Play  Space"))

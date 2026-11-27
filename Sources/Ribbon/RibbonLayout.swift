@@ -9,7 +9,8 @@ import CoreText
 // 所以对准摄像头的不是「正在念的字」，而是眼睛停的地方：
 // - 蓝点 = 眼睛该看的地方，正对摄像头（屏幕正中）。
 // - 正在念的字在蓝点左边两三个字（lookahead）；蓝点上面是马上要念的字。
-// - 有刘海：摄像头被刘海挡着，蓝点放在刘海右边最近、看得见字的地方。
+// - 有刘海：不在菜单栏那一行（字会从刘海后面穿过去，看不全，眼睛也偏到摄像头旁边去了），
+//   挂在刘海正下方：一个圆角胶囊，从刘海底下长出来，蓝点正对摄像头。
 // 横向偏一度左右，看的人就会觉得你没在看他（往下偏能宽容得多），
 // 在 MacBook 上大概就是三个字宽，所以亮的部分集中在蓝点附近，远处的字暗一些。
 // 两头伸多远可以拖胶囊的边缘来改，记在设置里（以字号为单位）。
@@ -40,34 +41,45 @@ struct RibbonGeometry: Equatable {
 
     static func make(screen: NSScreen, size: Int, left: Double, right: Double) -> RibbonGeometry {
         let screenFrame = screen.frame
-        let notchHeight = screen.safeAreaInsets.top
         let status = statusItems(on: screen)
+        // 刘海：真的，或者测试时假装有一个（`-fakeNotch YES`，在没刘海的屏幕上看刘海屏的样子）。
+        var notchHeight = screen.safeAreaInsets.top
+        var notch: ClosedRange<CGFloat>?
+        if notchHeight > 0, let leftArea = screen.auxiliaryTopLeftArea, let rightArea = screen.auxiliaryTopRightArea {
+            // 这两块区域的 minX 都是屏幕的左边，不管是不是全局坐标。
+            notch = (leftArea.maxX - leftArea.minX)...(rightArea.minX - leftArea.minX)
+        } else if UserDefaults.standard.bool(forKey: "fakeNotch") {
+            notchHeight = status.height ?? max(screenFrame.maxY - screen.visibleFrame.maxY, NSStatusBar.system.thickness, 22)
+            let middle = (screenFrame.width / 2).rounded()
+            notch = (middle - 95)...(middle + 95)
+        }
         // 菜单栏多高：有刘海就是刘海的高度；否则量右边图标的窗口，量不到再问系统。
-        let menuBar = notchHeight > 0 ? notchHeight
+        let menuBar = notch != nil ? notchHeight
             : (status.height ?? max(screenFrame.maxY - screen.visibleFrame.maxY, NSStatusBar.system.thickness, 22))
         let step = min(max(0, size), Preferences.sizeSteps - 1)
         // 字号从菜单栏自己的字号起算：中号就和菜单一样大。
         let menuFont = NSFont.menuBarFont(ofSize: 0).pointSize
         let fontSize = menuFont + [-1, 0, 2, 4, 6][step]
-        let height = step <= 1 ? menuBar : max(menuBar, (fontSize * 1.7).rounded())
         let leftExtent = (CGFloat(left) * fontSize).rounded()
         let rightExtent = (CGFloat(right) * fontSize).rounded()
 
-        if notchHeight > 0, let leftArea = screen.auxiliaryTopLeftArea, let rightArea = screen.auxiliaryTopRightArea {
-            // 这两块区域的 minX 都是屏幕的左边，不管是不是全局坐标。
-            let notch = (leftArea.maxX - leftArea.minX)...(rightArea.minX - leftArea.minX)
-            let camera = (notch.lowerBound + notch.upperBound) / 2
-            let anchor = notch.upperBound + max(8, fontSize * 0.5)
-            let gaze = anchor + fontSize * lookahead
-            let start = max(0, min(notch.lowerBound - fontSize * 4, camera - leftExtent))
-            let end = min(screenFrame.width, max(anchor + fontSize * 8, camera + rightExtent))
-            let local = (notch.lowerBound - start)...(notch.upperBound - start)
+        if let notch {
+            // 挂在刘海下面：摄像头就在刘海正中，蓝点正对它，往下差不到一厘米。
+            let camera = ((notch.lowerBound + notch.upperBound) / 2).rounded()
+            let height = max(24, (fontSize * 1.85).rounded())
+            let gap: CGFloat = 4
+            let start = max(0, camera - max(fontSize * 4, leftExtent))
+            let end = min(screenFrame.width, camera + max(fontSize * 8, rightExtent))
+            let local = camera - start
+            let anchor = (local - fontSize * lookahead).rounded()
+            let under = max(0, notch.lowerBound - start)...min(end - start, notch.upperBound - start)
             return RibbonGeometry(
-                frame: NSRect(x: screenFrame.minX + start, y: screenFrame.maxY - height, width: end - start, height: height),
-                notch: local, anchor: anchor - start, dot: gaze - start, fontSize: fontSize,
-                statusRight: local.lowerBound - fontSize * 0.6, openFrom: local, camera: camera - start)
+                frame: NSRect(x: screenFrame.minX + start, y: screenFrame.maxY - notchHeight - gap - height, width: end - start, height: height),
+                notch: nil, anchor: anchor, dot: local, fontSize: fontSize,
+                statusRight: anchor - fontSize * 0.8, openFrom: under, cornerRadius: height / 2, camera: local)
         }
 
+        let height = step <= 1 ? menuBar : max(menuBar, (fontSize * 1.7).rounded())
         let camera = (screenFrame.width / 2).rounded()
         let start = max(0, camera - max(fontSize * 4, leftExtent))
         let end = min(screenFrame.width, camera + max(fontSize * 8, rightExtent))

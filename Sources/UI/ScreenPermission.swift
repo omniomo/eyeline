@@ -70,6 +70,43 @@ struct ScreenPermissionCard: View {
     }
 }
 
+// MARK: - 搬进「应用程序」
+
+/// 直接从 dmg 里打开、哪里都搜不到它时，窗口里的一张卡片：App 图标，一句话，「移到应用程序」/「以后再说」。
+struct MoveToApplicationsCard: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        ZStack {
+            Color.white.opacity(0.55)
+                .contentShape(Rectangle())
+                .onTapGesture {}
+            VStack(spacing: 0) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 64, height: 64)
+                    .padding(.bottom, 12)
+                Text("Move Eyeline to Applications?")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Paper.ink)
+                    .padding(.bottom, 20)
+                PrimaryButton(title: String(localized: "Move to Applications")) { model.moveToApplications() }
+                Button { model.declineMove() } label: {
+                    Text("Not now")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Paper.gray)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 12)
+            }
+            .padding(.horizontal, 30)
+            .padding(.vertical, 28)
+            .frame(width: 300)
+            .glass(cornerRadius: 24)
+        }
+    }
+}
+
 // MARK: - 系统设置上的拖拽引导
 
 /// 浮在系统设置窗口上：箭头的尖落在右边的列表里，Eyeline 的图标在窗口下边。跟着系统设置窗口走；系统设置关了它也收起。

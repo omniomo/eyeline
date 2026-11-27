@@ -123,7 +123,11 @@ final class Prompter: ObservableObject {
     private var base: Double = 0
     private var lead: Double = 0
     private var rate: Double = 4
+    /// 现在大概每秒念几个字（提词条追上去的时候，速度按这个来）。
+    var speechRate: Double { rate }
     private var lastConfirm: CFTimeInterval = 0
+    /// 说了一阵稿子以外的话、停下来时，重新开过一段识别（同一段自由发挥只开一次）。
+    private var freshAfterAdlib: CFTimeInterval = 0
     private var hold: TimeInterval = 0
     private var countdownEnd: CFTimeInterval = 0
     private var finishedAt: CFTimeInterval = 0
@@ -439,7 +443,15 @@ final class Prompter: ObservableObject {
             elapsed += dt
             switch activeMode {
             case .follow:
-                if isTalking { lead = min(lead + rate * dt, min(2.5, rate * 0.45)) }
+                // 刚对上过才往前多走一点；说稿子以外的话时不往前蹭，停在那儿等你
+                if isTalking, now - lastConfirm < 1.2 { lead = min(lead + rate * dt, min(2.5, rate * 0.45)) }
+                // 说了一阵稿子以外的话（一秒半以上没对上），一停下来就重新开一段识别：
+                // 接着念稿子时，识别不会被刚才那些话拖着，对得上得快
+                if !isTalking, lastLoud > lastConfirm + 1.5, now - lastLoud > 0.45, freshAfterAdlib < lastLoud {
+                    freshAfterAdlib = now
+                    listener.restartTask()
+                    Log.info("off script, then a pause: fresh recognition")
+                }
             case .pace:
                 if isTalking {
                     waitingForVoice = false

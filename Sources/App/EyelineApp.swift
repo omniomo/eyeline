@@ -21,8 +21,14 @@ struct EyelineApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // 「编辑」菜单里系统自己加的「开始听写」「表情与符号」：用不上，不要（得在菜单建好之前说）
+        UserDefaults.standard.register(defaults: ["NSDisabledDictationMenuItem": true, "NSDisabledCharacterPaletteMenuItem": true])
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         if Probe.runIfRequested() { return }
+        MenuTrim.start()
     }
 
     /// 关掉窗口不退出：提词条可能还开着。点 Dock 图标再打开窗口。
@@ -76,6 +82,11 @@ struct PromptCommands: Commands {
             Button("Quick Start") { model.startQuickStart() }
             Button("Keyboard Shortcuts") { model.show(.shortcuts) }
                 .keyboardShortcut("/")
+            Divider()
+            Link("Eyeline Website", destination: URL(string: "https://eyeline.ooooomo.com/")!)
+            Link("Send Feedback", destination: URL(string: "https://github.com/omniomo/eyeline/issues")!)
+            Divider()
+            Link("Made by OMO", destination: URL(string: "https://ooooomo.com/")!)
         }
         CommandMenu("Prompt") {
             if prompter.isActive {
@@ -102,5 +113,45 @@ struct PromptCommands: Commands {
             Button("Smaller") { prompter.changeSize(-1) }
                 .keyboardShortcut("-", modifiers: [.command, .option])
         }
+    }
+}
+
+
+/// 菜单里系统自己塞进来、Eyeline 用不上的几项（写作工具、自动填充、听写、表情与符号）拿掉。
+/// 真有用的东西应该在界面上，而不是藏在菜单深处。
+enum MenuTrim {
+    private static let actions: Set<String> = ["showWritingTools:", "startDictation:", "orderFrontCharacterPalette:"]
+    private static let titles: Set<String> = ["Writing Tools", "写作工具", "AutoFill", "自动填充", "Start Dictation…", "开始听写…", "Emoji & Symbols", "表情与符号"]
+
+    static func start() {
+        trimMainMenu()
+        // 菜单栏每次打开前再理一遍（SwiftUI 会重建菜单，系统也会再塞）
+        NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { note in
+            guard (note.object as? NSMenu) === NSApp.mainMenu else { return }
+            trimMainMenu()
+        }
+    }
+
+    static func trimMainMenu() {
+        NSApp.mainMenu?.items.compactMap(\.submenu).forEach(trim)
+    }
+
+    /// 拿掉不要的项，再把多出来的分隔线收掉。
+    static func trim(_ menu: NSMenu) {
+        for item in menu.items.reversed() where unwanted(item) { menu.removeItem(item) }
+        var previousWasSeparator = true
+        for item in menu.items {
+            if item.isSeparatorItem, previousWasSeparator { menu.removeItem(item); continue }
+            previousWasSeparator = item.isSeparatorItem
+        }
+        if let last = menu.items.last, last.isSeparatorItem { menu.removeItem(last) }
+    }
+
+    private static func unwanted(_ item: NSMenuItem) -> Bool {
+        if let action = item.action, actions.contains(NSStringFromSelector(action)) { return true }
+        if titles.contains(item.title) { return true }
+        if let sub = item.submenu,
+           sub.items.contains(where: { $0.action.map { NSStringFromSelector($0).lowercased().contains("autofill") } ?? false }) { return true }
+        return false
     }
 }

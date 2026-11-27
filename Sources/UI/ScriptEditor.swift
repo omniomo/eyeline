@@ -93,10 +93,14 @@ struct ScriptEditor: NSViewRepresentable {
                 guard !(textView.window?.firstResponder is NSTableView) else { return }
                 textView.window?.makeFirstResponder(textView)
             }
-        } else if textView.string != text && !coordinator.editing {
+        } else if textView.string != text && !coordinator.editing && !textView.hasMarkedText() {
+            // 外面改了字（输入法还在组字时不动它）：换掉，光标留在原来的地方，不跳到结尾
+            let selection = textView.selectedRange()
             coordinator.applying = true
             textView.string = text
             textView.restyle()
+            let length = (text as NSString).length
+            textView.setSelectedRange(NSRange(location: min(selection.location, length), length: 0))
             coordinator.applying = false
         }
 
@@ -127,7 +131,9 @@ struct ScriptEditor: NSViewRepresentable {
         init(_ parent: ScriptEditor) { self.parent = parent }
 
         func textDidChange(_ notification: Notification) {
-            guard !applying, let textView = notification.object as? NSTextView else { return }
+            // 输入法还在组字（拼音、语音输入的半成品）：先不交给外面，等字定下来那一下再交
+            // （每打一个拼音字母都存一遍、重排一遍，豆包这类输入法会很卡，还会被换掉的字顶回结尾）
+            guard !applying, let textView = notification.object as? NSTextView, !textView.hasMarkedText() else { return }
             editing = true
             parent.text = textView.string
             editing = false
@@ -135,13 +141,16 @@ struct ScriptEditor: NSViewRepresentable {
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
-            guard !applying, let textView = notification.object as? NSTextView else { return }
+            guard !applying, let textView = notification.object as? NSTextView, !textView.hasMarkedText() else { return }
             parent.onCursor(textView.selectedRange().location)
         }
     }
 }
 
 final class PaperTextView: NSTextView {
+    // 右键菜单只留剪切、拷贝、粘贴：系统那一长串（写作工具、自动填充、服务、语音……）用不上
+    override func menu(for event: NSEvent) -> NSMenu? { TextMenu.make() }
+
     // 鼠标：只在看得见字、没被盖住的地方是 I 形；底栏、面板、回放盖着的地方是箭头（见 TextCursor）
     override func resetCursorRects() {
         for rect in TextCursor.rects(in: self) { addCursorRect(rect, cursor: .iBeam) }

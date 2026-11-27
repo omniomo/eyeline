@@ -331,6 +331,26 @@
         }
       }
     },
+    "Copy": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拷贝"
+          }
+        }
+      }
+    },
+    "Couldn’t move Eyeline — drag it into Applications": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没能移过去，请把 Eyeline 拖进「应用程序」"
+          }
+        }
+      }
+    },
     "Couldn’t read this file": {
       "localizations": {
         "zh-Hans": {
@@ -347,6 +367,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "匀速滚动前倒计时"
+          }
+        }
+      }
+    },
+    "Cut": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "剪切"
           }
         }
       }
@@ -461,6 +491,16 @@
         }
       }
     },
+    "Eyeline Website": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eyeline 官网"
+          }
+        }
+      }
+    },
     "Faster": {
       "localizations": {
         "zh-Hans": {
@@ -537,6 +577,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "按当前速度，从蓝点处读到结尾的预计时长"
+          }
+        }
+      }
+    },
+    "Got it": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "知道了"
           }
         }
       }
@@ -761,6 +811,16 @@
         }
       }
     },
+    "Made by OMO": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Made by OMO"
+          }
+        }
+      }
+    },
     "Main screen": {
       "localizations": {
         "zh-Hans": {
@@ -841,6 +901,26 @@
         }
       }
     },
+    "Move Eyeline to Applications?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把 Eyeline 移到「应用程序」？"
+          }
+        }
+      }
+    },
+    "Move to Applications": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移到「应用程序」"
+          }
+        }
+      }
+    },
     "Move to Trash": {
       "localizations": {
         "zh-Hans": {
@@ -897,6 +977,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "较新的录像  ↑"
+          }
+        }
+      }
+    },
+    "Next": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一步"
           }
         }
       }
@@ -1081,6 +1171,16 @@
         }
       }
     },
+    "Open at login": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录时打开"
+          }
+        }
+      }
+    },
     "Open in Finder": {
       "localizations": {
         "zh-Hans": {
@@ -1117,6 +1217,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "粘贴或拖入讲稿"
+          }
+        }
+      }
+    },
+    "Pasted into this slide": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已粘贴到这一页"
           }
         }
       }
@@ -1381,6 +1491,16 @@
         }
       }
     },
+    "Send Feedback": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "反馈问题"
+          }
+        }
+      }
+    },
     "Settings": {
       "localizations": {
         "zh-Hans": {
@@ -1557,6 +1677,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "语音识别未授权"
+          }
+        }
+      }
+    },
+    "Split into %lld slides": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按空行分成 %lld 页"
           }
         }
       }

@@ -175,6 +175,13 @@ ZH = {
     "Fixed speed": "固定速度",
     "No background": "无背景",
     "Recording": "录制",
+    "Cut": "剪切",
+    "Copy": "拷贝",
+    "Eyeline Website": "Eyeline 官网",
+    "Send Feedback": "反馈问题",
+    "Made by OMO": "Made by OMO",
+    "Pasted into this slide": "已粘贴到这一页",
+    "Split into %lld slides": "按空行分成 %lld 页",
     "Record only the slide while presenting": "放映时只录幻灯片",
     "Yesterday": "昨天",
     "Settings…": "设置…",
@@ -193,6 +200,12 @@ ZH = {
     "Peach": "蜜桃",
     "Sky": "晴空",
     "Night": "夜色",
+    "Next": "下一步",
+    "Got it": "知道了",
+    "Move Eyeline to Applications?": "把 Eyeline 移到「应用程序」？",
+    "Move to Applications": "移到「应用程序」",
+    "Couldn’t move Eyeline — drag it into Applications": "没能移过去，请把 Eyeline 拖进「应用程序」",
+    "Open at login": "登录时打开",
 }
 
 catalog = {"sourceLanguage": "en", "strings": {}, "version": "1.0"}

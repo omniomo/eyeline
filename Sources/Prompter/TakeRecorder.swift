@@ -375,8 +375,9 @@ final class TakeRecorder: NSObject, ObservableObject {
 
     /// MacBook 自己的摄像头优先（提词条在它下面），没有再用别的。
     private static func camera() -> AVCaptureDevice? {
-        let discovery = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera, .external],
-                                                         mediaType: .video, position: .unspecified)
+        var types: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera]
+        if #available(macOS 14.0, *) { types.append(.external) } else { types.append(.externalUnknown) }
+        let discovery = AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: .unspecified)
         return discovery.devices.first { $0.deviceType == .builtInWideAngleCamera }
             ?? discovery.devices.first ?? AVCaptureDevice.default(for: .video)
     }
