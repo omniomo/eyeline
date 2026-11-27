@@ -1,11 +1,28 @@
-<p align="center"><img src="tools/icon-1024.png" width="96" alt=""></p>
+<div align="center">
+  <img src="tools/icon-1024.png" width="88" alt="">
+  <h3>Eyeline</h3>
+  <p>The best Mac menu bar teleprompter</p>
+  <p>
+    <a href="https://github.com/omniomo/eyeline/releases/latest"><b>Download</b></a> ·
+    <a href="https://eyeline.ooooomo.com/">Website</a> ·
+    <a href="README.zh.md">简体中文</a>
+  </p>
+  <br>
+  <img src="docs/shots/en/slides.webp" width="720" alt="Drop a deck into Eyeline: every slide comes with its lines">
+</div>
 
-<h1 align="center"><a href="https://eyeline.ooooomo.com/">Eyeline</a></h1>
+## Install
 
-<p align="center">The best Mac menu bar teleprompter<br><a href="README.zh.md">简体中文</a></p>
+Download the dmg from the [latest release](https://github.com/omniomo/eyeline/releases/latest) and drag Eyeline into Applications. macOS 14 or later, Apple silicon and Intel.
 
-<p align="center"><img src="docs/shots/en/hero.webp" width="80%" alt="While presenting, your lines run right under the camera"></p>
+## Privacy
 
-<p align="center"><img src="docs/shots/en/slides.webp" width="80%" alt="Drop a deck into Eyeline: each slide comes with its lines"></p>
+Eyeline doesn't go online and collects nothing. It uses the speech recognition built into macOS: when your Mac can recognize speech on device, your voice never leaves it. [Privacy policy](https://eyeline.ooooomo.com/privacy/)
 
-<p align="center"><a href="https://github.com/omniomo/eyeline/releases/latest"><b>Download</b></a> · macOS 14 or later · <a href="LICENSE">MIT</a></p>
+## Donate
+
+If Eyeline helps you, [GitHub Sponsors](https://github.com/sponsors/omniomo) · [Ko-fi](https://ko-fi.com/aerisz)
+
+## License
+
+[MIT](LICENSE)
