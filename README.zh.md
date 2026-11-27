@@ -13,7 +13,7 @@
 
 ## 安装
 
-在[最新版本](https://github.com/omniomo/eyeline/releases/latest)里下载 dmg，把 Eyeline 拖进「应用程序」。macOS 14 及以上，Apple 芯片和 Intel 都能用。
+在[最新版本](https://github.com/omniomo/eyeline/releases/latest)里下载 dmg，把 Eyeline 拖进「应用程序」。macOS 13 及以上，Apple 芯片和 Intel 都能用。
 
 ## 隐私
 
