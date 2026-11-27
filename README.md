@@ -25,4 +25,4 @@ If Eyeline helps you: [GitHub Sponsors](https://github.com/sponsors/omniomo)
 
 ## License
 
-[MIT](LICENSE)
+[GPL-3.0](LICENSE)

@@ -30,6 +30,8 @@ targets:
         excludes:
           - Resources/Info.plist
           - Resources/Eyeline.entitlements
+      - path: LICENSE
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.omniomo.eyeline

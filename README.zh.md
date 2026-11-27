@@ -25,4 +25,4 @@ Eyeline 不联网，不收集任何东西。语音识别用的是 macOS 自带�
 
 ## License
 
-[MIT](LICENSE)
+[GPL-3.0](LICENSE)

@@ -40,6 +40,7 @@
 		93281A3CC261000902D9051E /* SlideImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E578A27A1C1014ADEDED004 /* SlideImport.swift */; };
 		9DEB50721F3F062E726756C7 /* CameraBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1072F7466234D9C0B9B10E74 /* CameraBubble.swift */; };
 		A02CFE683347CD3CEA3D2578 /* RibbonLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF77CD1AF03C56E494486DAD /* RibbonLayout.swift */; };
+		A444377F777F9710F74EEF0A /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = B539DF19B8C8F152B8CA068C /* LICENSE */; };
 		A520F1FC66AA322C4526A2A6 /* TrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C91951B8ED5D678F91601B6 /* TrackerTests.swift */; };
 		A74D0E7C7AF4AD77B1781751 /* Tokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7454169E091BBBFB0E41E73B /* Tokenizer.swift */; };
 		AC87DD4A4FF96ACBFAF790D7 /* Listener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320DBFA07129CD67BF021D64 /* Listener.swift */; };
@@ -90,6 +91,7 @@
 		A405D9BAF4B6FFCA90194511 /* RibbonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RibbonView.swift; sourceTree = "<group>"; };
 		ADDBB4DD59D1B37F4403C5DC /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		AF77CD1AF03C56E494486DAD /* RibbonLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RibbonLayout.swift; sourceTree = "<group>"; };
+		B539DF19B8C8F152B8CA068C /* LICENSE */ = {isa = PBXFileReference; path = LICENSE; sourceTree = "<group>"; };
 		B8AF1B9D155FF33AC99F2AAE /* SlideRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideRenderer.swift; sourceTree = "<group>"; };
 		BAAB38193CCD582A2917985C /* Countdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Countdown.swift; sourceTree = "<group>"; };
 		BBD7AF7948593D243CF874EC /* Design.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Design.swift; sourceTree = "<group>"; };
@@ -239,6 +241,7 @@
 		EDB79BB88AE08D5703C3E452 = {
 			isa = PBXGroup;
 			children = (
+				B539DF19B8C8F152B8CA068C /* LICENSE */,
 				4B7978E6CA3CE85D2D0D51D1 /* Sources */,
 				09E78997961DB0A0A530F38D /* Tests */,
 				A822853FF6E059E30778F6FC /* Products */,
@@ -331,6 +334,7 @@
 				B8087DA8CF3EA4B747785C94 /* AppIcon.icon in Resources */,
 				345D1F63ECE7B5B67602747D /* Assets.xcassets in Resources */,
 				718C7A841D4609D878BDD6B0 /* InfoPlist.xcstrings in Resources */,
+				A444377F777F9710F74EEF0A /* LICENSE in Resources */,
 				8D7D878542B339C41206D800 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

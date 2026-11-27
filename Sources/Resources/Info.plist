@@ -30,7 +30,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Made by OMO · MIT License</string>
+	<string>Copyright © 2026 OMO · GPL-3.0 License</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Eyeline follows your slides in Keynote or PowerPoint, so the script jumps to the slide you are on.</string>
 	<key>NSCameraUsageDescription</key>
