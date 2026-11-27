@@ -41,6 +41,9 @@ final class RibbonController {
         }
     }
 
+    /// 提词条的窗口（录屏时要留下它就用这个；下面那排小按钮不算）。
+    var windows: [NSWindow] { [panel].compactMap { $0 } }
+
     func hide() {
         controls.hideNow()
         guard let view, let panel else { return }

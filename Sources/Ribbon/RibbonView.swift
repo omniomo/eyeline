@@ -238,8 +238,8 @@ final class RibbonView: NSView {
     private func updateBackground() {
         guard let background, let geometry else { return }
         let range = openedRange
-        // 放幻灯片时提词条那一行是黑的（见 SlideShow）：不要玻璃底，字直接浮在黑色上，和屏幕边框连成一片
-        background.isHidden = reveal <= 0.001 || AppModel.shared.presenting
+        // 放幻灯片时也要玻璃底：上面是系统自己的菜单栏，没有底的话右边的图标会透过来，和字叠在一起
+        background.isHidden = reveal <= 0.001
         let frame = NSRect(x: range.left, y: 0, width: max(0, range.right - range.left), height: bounds.height)
         if background.frame != frame { background.frame = frame }
         if maskRadius != geometry.cornerRadius {

@@ -14,12 +14,18 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "0.1.3"
-    CURRENT_PROJECT_VERSION: "6"
+    CURRENT_PROJECT_VERSION: "7"
     # 用开发证书签名（不要 ad-hoc）：ad-hoc 每编译一次签名就变，系统会当成另一个 App，
     # 摄像头、麦克风、屏幕录制的权限每次都要重新给
     CODE_SIGN_IDENTITY: "Apple Development"
     CODE_SIGN_STYLE: Manual
     DEVELOPMENT_TEAM: 88D7C437XC
+    # 权限认的是签名里的「designated requirement」。系统默认的那条连证书一起认：开发证书编的和 Developer ID 发布的
+    # 对不上，两种装来装去，权限就丢一次。这里统一成「这个 bundle id + 我们团队（88D7C437XC）的任何苹果证书」，
+    # 开发版、发布版都一样，给过一次就一直在（tools/eyeline.req；release.sh 里也带上）。
+    OTHER_CODE_SIGN_FLAGS: "--requirements $(SRCROOT)/tools/eyeline.req"
+    # Debug 不拆出 Eyeline.debug.dylib（Xcode 预览才用）：整个 App 只有一个可执行文件，签名完整，上面那条 requirement 也只落在它身上
+    ENABLE_DEBUG_DYLIB: NO
     DEAD_CODE_STRIPPING: YES
 targets:
   Eyeline:

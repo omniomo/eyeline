@@ -37,7 +37,7 @@ ZH = {
     "While prompting": "提词时",
     "These keys work in any app while the ribbon is showing, and go back to normal when it closes.": "提词条显示期间，以下快捷键在所有 App 中均可使用；提词条关闭后即恢复。",
     "Prompt": "提词",
-    "Start from the Blue Dot": "从蓝点处开始",
+    "Start from ▶": "从 ▶ 处开始",
     "Start from the Beginning": "从头开始",
     "Bigger": "增大字号",
     "Smaller": "减小字号",

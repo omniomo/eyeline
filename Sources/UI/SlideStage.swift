@@ -287,15 +287,13 @@ struct SlideShow: View {
 
     var body: some View {
         let page = deck.page
-        // 窗口铺满整块屏幕；顶上让出提词条那一条，幻灯片在剩下的地方放到最大（和录的那一块一样）
+        // 窗口铺满系统菜单栏下面的整块屏幕；顶上让出提词条那一条，幻灯片在剩下的地方放到最大（和录的那一块一样）
         GeometryReader { geometry in
             let top = model.presentationTopInset
             let size = fitted(in: CGSize(width: geometry.size.width, height: geometry.size.height - top))
             ZStack(alignment: .top) {
+                // 四周（包括顶上提词条那一条）都是白的：上面是系统自己的菜单栏，不再涂黑
                 Paper.white
-                // 顶上让给提词条的那一条涂黑：和屏幕的黑边框、提词条连成一片，不留一道白缝
-                // （系统全屏时菜单栏那一行也是黑的）
-                Color.black.frame(height: top)
                 if let image = deck.render(page, fitting: size) {
                     Image(nsImage: image)
                         .resizable()

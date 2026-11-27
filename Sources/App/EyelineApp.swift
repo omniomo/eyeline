@@ -93,7 +93,7 @@ struct PromptCommands: Commands {
                 Button("Stop") { model.play() }
                     .keyboardShortcut(.return, modifiers: .command)
             } else {
-                Button("Start from the Blue Dot") { model.play() }
+                Button("Start from ▶") { model.play() }
                     .keyboardShortcut(.return, modifiers: .command)
                     .disabled(!model.canPlay)
             }

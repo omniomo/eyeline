@@ -21,8 +21,10 @@ final class AppModel: ObservableObject {
 
     @Published var selection: UUID? {
         didSet {
-            guard selection != oldValue, let document else { return }
-            focus(document.resume)
+            guard selection != oldValue, document != nil else { return }
+            // 打开一份稿子：光标和 ▶ 都在最上面，从头开始。上次停在哪不记着（记着反而让人摸不着头脑）；
+            // 刚停下时 ▶ 会留在停下的那一句（见 prompter.onStop），想接着念就接着念。
+            focus(textStart)
             loadDeck()
         }
     }
@@ -209,12 +211,13 @@ final class AppModel: ObservableObject {
     private let countdown = CountdownPanel()
     /// 录的那一块四周的框（倒数时显示，开始录时闪一下淡掉）。
     private let recordingFrame = RecordingFrame()
-    /// 录整块屏幕时先把 Eyeline 的窗口收起来，让你看见真正在录的东西；录完、不录了再拿出来。
+    /// 录整块屏幕时先把 Eyeline 的窗口最小化到 Dock，让你看见真正在录的东西；录完、不录了再拿出来。
     private var hiddenWindow: NSWindow?
 
     private func bringBackWindow() {
         guard let window = hiddenWindow else { return }
         hiddenWindow = nil
+        if window.isMiniaturized { window.deminiaturize(nil) }
         window.makeKeyAndOrderFront(nil)
         NSApp.bringToFront()
     }
@@ -338,7 +341,12 @@ final class AppModel: ObservableObject {
     private func screenShot(_ shot: RecordLayout, region: CGRect, screen: NSScreen, keeping: [NSWindow]) -> TakeRecorder.ScreenShot {
         TakeRecorder.ScreenShot(region: region, screen: screen,
                                 bubble: shot.needsCamera ? (center: CGPoint(x: prefs.bubbleX, y: prefs.bubbleY), size: CGFloat(prefs.bubbleSize)) : nil,
-                                hideOwnWindows: true, keeping: keeping)
+                                hideOwnWindows: true, keeping: keeping,
+                                // 设置里关了「录屏时隐藏」：提词条也录进去（做演示时要看见它）
+                                alsoKeeping: { [weak self] in
+                                    guard let self, !self.prefs.hideFromCapture else { return [] }
+                                    return self.ribbon.windows
+                                })
     }
 
     /// 三步上手现在在第几步（nil：没在看）。第一次打开时自动出来，菜单「帮助 › 快速上手」再看一遍。
@@ -434,7 +442,7 @@ final class AppModel: ObservableObject {
             if self.showsStoryboard { self.requestPageFocus(self.deck.page, atEnd: true) }
         }
         selection = store.documents.first?.id
-        if let document { focus(document.resume) }
+        if document != nil { focus(textStart) }
         loadDeck()
         // 换了界面语言、自己重新打开的：把设置再打开，接着看
         if UserDefaults.standard.bool(forKey: "reopenSettings") {
@@ -547,8 +555,10 @@ final class AppModel: ObservableObject {
 
         // 录好一条：把窗口叫到前面，马上回放这一条。
         recorder.onFinished = { [weak self] _ in
-            self?.hiddenWindow = nil
-            self?.openMainWindow?()
+            guard let self else { return }
+            if let window = self.hiddenWindow ?? self.mainWindow, window.isMiniaturized { window.deminiaturize(nil) }
+            self.hiddenWindow = nil
+            self.openMainWindow?()
             NSApp.bringToFront()
         }
         // 倒数的时候按空格（⌥空格）：马上开始
@@ -585,7 +595,7 @@ final class AppModel: ObservableObject {
         // 回到 Eyeline：幻灯片可能刚重新导出过（同一个文件），重新读一下；没改过就什么也不做。
         NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
             .sink { [weak self] _ in
-                guard let self, let url = self.deck.url, !self.prompter.isActive else { return }
+                guard let self, let url = self.deck.url, !self.promptingSelection else { return }
                 self.deck.load(url, at: self.deck.page)
                 if let id = self.selection { self.followMovedPage(self.syncSlides(id)) }
             }
@@ -621,7 +631,7 @@ final class AppModel: ObservableObject {
     }
 
     func setCursor(_ offset: Int) {
-        guard !prompter.isActive, cursor != offset else { return }
+        guard !promptingSelection, cursor != offset else { return }
         cursor = offset
         // 在稿子里点到哪一页的稿子，幻灯片就翻到哪一页。
         if deck.isLoaded, let page = page(at: offset) { deck.go(to: page) }
@@ -665,7 +675,7 @@ final class AppModel: ObservableObject {
             }
         }
         recorder.dismiss()
-        var offset = fromBeginning ? 0 : cursor
+        var offset = fromBeginning ? 0 : playStart
         // 配了幻灯片：光标停在某一页的话末尾（刚导入、刚粘贴完、点进那一行时都会这样），这一页就没得念了，
         // 一开始就停在页末等翻页。这时从这一页开头念。停在一页中间（上次念到这里）照旧接着念。
         if showsStoryboard, !fromBeginning {
@@ -738,16 +748,50 @@ final class AppModel: ObservableObject {
             }
         } else {
             let screen = RibbonGeometry.screen(for: prefs.display)
-            // 录整块屏幕：Eyeline 的窗口反正不录，先收起来，让你看见真正在录的东西
+            // 录整块屏幕：先把 Eyeline 的窗口最小化到 Dock，让你看见真正在录的东西。
+            // 录的时候从 Dock 点回来，窗口照样录得进去（keeping）；不录的只有提词条、它的按钮、倒数这些。
             if let window = mainWindow {
                 hiddenWindow = window
-                window.orderOut(nil)
+                window.miniaturize(nil)
+                stage(screen.frame, screen, [window])
+            } else {
+                stage(screen.frame, screen, [])
             }
-            stage(screen.frame, screen, [])
         }
     }
 
     var canPlay: Bool { !currentScript.isEmpty }
+
+    /// 按播放从原文哪里开始：光标所在那一句的开头，不从半句话开始。编辑器左边的 ▶ 标在这里。
+    /// 从第一句开始就是「从头开始」：▶ 标在第一行字上（哪怕是不念的 # 标题；开头的空行跳过），
+    /// 不会一会儿在标题那行、一会儿在正文第一行。
+    var playStart: Int {
+        let top = textStart
+        guard cursor > top else { return top }
+        let script = currentScript
+        var token = script.token(atRaw: cursor)
+        // 光标在一行字的末尾（或者这一行字后面的空白里）：算这一行，不是下一行。
+        // 不然在上面新加一行、光标停在行尾，▶ 就跳到下面那行去了。
+        if token > 0, token <= script.count {
+            let previous = script.tokens[token - 1].raw
+            let end = previous.location + previous.length
+            let text = script.text as NSString
+            if cursor >= end, cursor <= text.length,
+               !text.substring(with: NSRange(location: end, length: cursor - end)).contains(where: \.isNewline) {
+                token -= 1
+            }
+        }
+        guard token < script.count, !script.sentences.isEmpty else { return top }
+        let first = script.sentences[script.sentence(ofToken: token)].firstToken
+        return first == 0 ? top : script.rawOffset(ofToken: first)
+    }
+
+    /// 稿子里第一个字（开头的空行不算）：「从头开始」时 ▶ 和光标都在这一行，不停在空行上。
+    var textStart: Int {
+        let text = (document?.text ?? "") as NSString
+        let first = text.rangeOfCharacter(from: CharacterSet.whitespacesAndNewlines.inverted)
+        return first.location == NSNotFound ? 0 : first.location
+    }
 
     private var parsed: (text: String, skipCuts: Bool, script: Script)?
 
@@ -936,10 +980,16 @@ final class AppModel: ObservableObject {
                                    titleVisibility: NSWindow.TitleVisibility, fullSize: Bool,
                                    options: NSApplication.PresentationOptions)?
 
-    /// 放映时屏幕顶上让给提词条的那一条有多高：菜单栏那一行；有刘海时提词条挂在刘海下面，一直让到它下面。
+    /// 放映时窗口顶上让给提词条的那一条有多高（窗口从系统菜单栏下面开始，菜单栏本身不算）。
     var presentationTopInset: CGFloat {
-        guard let screen = mainWindow?.screen ?? NSScreen.main else { return NSStatusBar.system.thickness }
-        return topInset(on: screen)
+        guard let screen = mainWindow?.screen ?? NSScreen.main else { return 0 }
+        return max(0, topInset(on: screen) - menuBarHeight(on: screen))
+    }
+
+    /// 系统菜单栏占了屏幕顶上多高。放映时菜单栏照常显示、保持系统的样子，窗口从它下面开始；
+    /// 系统设了自动隐藏菜单栏就是 0。
+    private func menuBarHeight(on screen: NSScreen) -> CGFloat {
+        max(0, screen.frame.maxY - screen.visibleFrame.maxY)
     }
 
     private func topInset(on screen: NSScreen) -> CGFloat {
@@ -952,7 +1002,7 @@ final class AppModel: ObservableObject {
         return top
     }
 
-    /// 放映时幻灯片在屏幕上的位置（AppKit 全局坐标）：整块屏幕顶上让出提词条那一条，剩下的按幻灯片的比例放到最大、居中。
+    /// 放映时幻灯片在屏幕上的位置（AppKit 全局坐标）：整块屏幕顶上让出菜单栏和提词条那一条，剩下的按幻灯片的比例放到最大、居中。
     /// 录屏幕时录的就是这一块（不带上下的白边）。
     func presentedSlide(on screen: NSScreen) -> CGRect {
         let top = topInset(on: screen)
@@ -978,7 +1028,8 @@ final class AppModel: ObservableObject {
     }
 
     /// 窗口变成这张幻灯片（录屏时先摆好）。已经是了就不动。
-    /// 放映：窗口铺满整块屏幕（菜单栏、程序坞先藏起来），幻灯片放到最大；顶上那一条留给提词条。
+    /// 放映：系统菜单栏照常留着（保持系统的样子），程序坞先藏起来；窗口铺满菜单栏下面的整块屏幕，
+    /// 幻灯片放到最大，顶上那一条留给提词条。
     private func enterPresentation(_ window: NSWindow) {
         guard windowBeforeShow == nil, !window.styleMask.contains(.fullScreen) else { return }
         windowBeforeShow = (window, window.frame, window.titlebarAppearsTransparent, window.titleVisibility,
@@ -987,9 +1038,11 @@ final class AppModel: ObservableObject {
         window.titleVisibility = .hidden
         window.styleMask.insert(.fullSizeContentView)
         setWindowButtons(of: window, hidden: true)
-        NSApp.presentationOptions = [.autoHideMenuBar, .autoHideDock]
+        NSApp.presentationOptions = [.autoHideDock]
         if let screen = window.screen ?? NSScreen.main {
-            window.setFrame(screen.frame, display: true, animate: true)
+            var frame = screen.frame
+            frame.size.height -= menuBarHeight(on: screen)
+            window.setFrame(frame, display: true, animate: true)
         }
         Log.info("slides: full screen, \(Int(window.frame.width))x\(Int(window.frame.height))")
     }
@@ -1108,7 +1161,7 @@ final class AppModel: ObservableObject {
 
     /// 分镜表里光标进了第 n 页那一行（local：在这一行里的位置）：幻灯片翻过去，播放从这里开始。
     func focusPage(_ n: Int, at local: Int) {
-        guard !prompter.isActive else { return }
+        guard !promptingSelection else { return }
         if deck.isLoaded { deck.go(to: n) }
         let length = (paged.text(ofPage: n) as NSString).length
         cursor = paged.start(ofPage: n) + min(local, length)
@@ -1139,7 +1192,9 @@ final class AppModel: ObservableObject {
 
     /// 换了稿子：换成它配的幻灯片（没配就清掉），翻到上次念到的那一页。同一份幻灯片不动；提词时也不动。
     private func loadDeck() {
-        guard !prompter.isActive, let document else { return }
+        // 正在念的就是这一份：幻灯片跟着提词翻，不动它。念的是别的稿子（比如录屏时把窗口叫回来、点开这份 PPT 讲给人看）：
+        // 照常显示这一份的幻灯片。
+        guard !promptingSelection, let document else { return }
         let url = document.slidesURL
         // 配过幻灯片，文件却找不到了（挪走了、删了）：说一声，上面是「把幻灯片拖进来」
         if document.slides != nil, url == nil, deck.url != nil || !deck.isLoaded {
@@ -1148,13 +1203,14 @@ final class AppModel: ObservableObject {
         guard url != deck.url || (url != nil && !deck.isLoaded) else { return }
         // 以前配了幻灯片、用「## 第 N 页」分页的稿子：换成一页一段
         if url != nil, !document.isPaged { makePaged(document.id) }
-        deck.load(url, at: page(at: store[document.id]?.resume ?? 0) ?? 1)
+        deck.load(url, at: page(at: cursor) ?? 1)
         followMovedPage(syncSlides(document.id))
     }
 
     /// 有人翻到了第 number 页：提词时跳到这一页的稿子；没在提词就让稿子跟过去（分镜表：那一行；没配上幻灯片的：那一段滚到最上面）。
     private func deckFlipped(to number: Int) {
-        if prompter.isActive {
+        // 只有正在念的这一份才让提词跟着翻；在看别的稿子时翻页，不去动正在念的那份。
+        if promptingSelection {
             prompter.goToPage(number)
             return
         }
@@ -1220,7 +1276,7 @@ final class AppModel: ObservableObject {
         announce(imported ? String(localized: "Imported “\(title)” · \(count) slides") : String(localized: "Slides paired · \(count) slides"))
         makePaged(id)
         store.setSlides(id, url)
-        guard id == selection, !prompter.isActive else { return }
+        guard id == selection, !promptingSelection else { return }
         deck.load(url, at: page(at: cursor) ?? 1)
         followMovedPage(syncSlides(id))
         prefs.showSlides = true

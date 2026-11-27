@@ -5,7 +5,8 @@ import ScreenCaptureKit
 // MARK: - 屏幕的画面
 //
 // 用 ScreenCaptureKit 录一块屏幕，每一帧交给 CompositeRecorder。
-// Eyeline 自己的窗口都不录（提词条、它的按钮、不放幻灯片时的讲稿窗口），只留下 keeping 里的：圆框人像、放映时的幻灯片窗口。
+// Eyeline 自己的窗口都不录（提词条、它的按钮、倒数），只留下 keeping 里的：圆框人像、放映时的幻灯片窗口、
+// 不放幻灯片时最小化起来的主窗口（录的时候点回来也录得进去）；设置里关了「录屏时隐藏」的话，还有提词条。
 // 鼠标照常录。要「屏幕录制」权限。
 // `-fakeScreen YES`：测试用，不录屏，送一块会动的假画面（不用权限）。
 
@@ -42,7 +43,8 @@ final class ScreenCapture: NSObject, SCStreamOutput, SCStreamDelegate {
         let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
         let scale = screen.backingScaleFactor
         let screenFrame = screen.frame
-        SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { [weak self] content, error in
+        // 连不在屏幕上的窗口也要（最小化了的主窗口），不然留不下它
+        SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: false) { [weak self] content, error in
             guard let self else { return }
             guard let content, let display = content.displays.first(where: { $0.displayID == displayID }) ?? content.displays.first else {
                 DispatchQueue.main.async { done(error ?? Failure.noDisplay) }

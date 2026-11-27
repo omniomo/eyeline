@@ -64,6 +64,8 @@ final class TakeRecorder: NSObject, ObservableObject {
         var bubble: (center: CGPoint, size: CGFloat)?
         var hideOwnWindows: Bool
         var keeping: [NSWindow]
+        /// 真开始录的那一刻再问一遍还要留下哪些（提词条：倒数时才摆出来，设置里关了「录屏时隐藏」才录它）。
+        var alsoKeeping: () -> [NSWindow] = { [] }
     }
     private let session = AVCaptureSession()
     private let output = AVCaptureMovieFileOutput()
@@ -198,7 +200,7 @@ final class TakeRecorder: NSObject, ObservableObject {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 guard self.startSerial == serial, self.composite.isRecording else { return }
-                var keeping = shot.keeping
+                var keeping = shot.keeping + shot.alsoKeeping()
                 if shot.bubble != nil, let window = self.bubble.window { keeping.append(window) }
                 let composite = self.composite
                 self.screen.start(region: shot.region, on: shot.screen, hideOwnWindows: shot.hideOwnWindows, keeping: keeping,

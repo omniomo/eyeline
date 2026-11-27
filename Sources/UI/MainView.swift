@@ -501,7 +501,7 @@ struct EditorPane: View {
                 documentID: document.id,
                 editable: !model.promptingSelection,
                 progress: model.progressOffset,
-                startOffset: model.cursor,
+                startOffset: model.playStart,
                 focus: model.focusRequest,
                 pageMarks: model.pageMarks,
                 zoom: prefs.zoom,

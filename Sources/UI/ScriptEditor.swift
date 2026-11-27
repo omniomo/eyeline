@@ -4,7 +4,7 @@ import AppKit
 // MARK: - 编辑器
 //
 // 一张白纸，字在中间一栏（最宽 640）。提词的时候不能改字：念过的部分变成雾灰，
-// 纸会跟着滚到正在念的那一行。左边空白里有一个小蓝点，标出播放会从哪里开始。
+// 纸会跟着滚到正在念的那一行。左边空白里有一个蓝色的小 ▶，标出按播放会从哪一句开始（光标所在那一句的开头）。
 
 struct ScriptEditor: NSViewRepresentable {
     @Binding var text: String
@@ -12,7 +12,7 @@ struct ScriptEditor: NSViewRepresentable {
     var editable: Bool
     /// 提词时：原文里念到哪了。
     var progress: Int?
-    /// 播放会从原文哪里开始（小蓝点）。
+    /// 播放会从原文哪里开始（左边的 ▶）。
     var startOffset: Int?
     /// 要求把光标放到这里（serial 变了才执行）。top：把这一行滚到最上面（翻幻灯片时用）。
     var focus: (offset: Int, serial: Int, top: Bool)?
@@ -394,15 +394,25 @@ final class PaperTextView: NSTextView {
                                        y: line.midY + textContainerOrigin.y - size.height / 2), withAttributes: attributes)
             }
         }
-        // 「从这里开始」：左边空白里一个小蓝点，对着开始的那一行。
-        if let startOffset, startOffset > 0, let layoutManager {
+        // 「从这里开始」：左边空白里一个蓝色的小播放三角，对着开始的那一行（在最前面也标，一看就知道按播放从哪念）。
+        if let startOffset, startOffset >= 0, let layoutManager {
             let length = (string as NSString).length
             guard startOffset < length else { return }
             let glyph = layoutManager.glyphIndexForCharacter(at: startOffset)
             let rect = layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
             let center = NSPoint(x: textContainerOrigin.x - 16, y: rect.midY + textContainerOrigin.y)
-            NSColor(srgbRed: 0x4A / 255, green: 0xA8 / 255, blue: 0xFF / 255, alpha: 1).setFill()
-            NSBezierPath(ovalIn: NSRect(x: center.x - 3, y: center.y - 3, width: 6, height: 6)).fill()
+            let play = NSBezierPath()
+            play.move(to: NSPoint(x: center.x - 3, y: center.y - 4.5))
+            play.line(to: NSPoint(x: center.x + 4.5, y: center.y))
+            play.line(to: NSPoint(x: center.x - 3, y: center.y + 4.5))
+            play.close()
+            play.lineJoinStyle = .round
+            play.lineWidth = 1.5
+            let blue = NSColor(srgbRed: 0x4A / 255, green: 0xA8 / 255, blue: 0xFF / 255, alpha: 1)
+            blue.setFill()
+            blue.setStroke()
+            play.fill()
+            play.stroke()
         }
     }
 

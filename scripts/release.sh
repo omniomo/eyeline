@@ -39,7 +39,7 @@ xcodegen generate --quiet
 xcodebuild -project Eyeline.xcodeproj -scheme Eyeline -configuration Release -derivedDataPath "$BUILD" \
   -destination 'generic/platform=macOS' ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$IDENTITY" DEVELOPMENT_TEAM=$TEAM \
-  OTHER_CODE_SIGN_FLAGS="--timestamp" ENABLE_HARDENED_RUNTIME=YES CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
+  OTHER_CODE_SIGN_FLAGS="--timestamp --requirements $PWD/tools/eyeline.req" ENABLE_HARDENED_RUNTIME=YES CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
   clean build > .dev/release-xcodebuild.log 2>&1 || { tail -n 40 .dev/release-xcodebuild.log; exit 1; }
 codesign --verify --deep --strict --verbose=2 "$APP"
 ENTITLEMENTS=$(codesign -d --entitlements - "$APP")

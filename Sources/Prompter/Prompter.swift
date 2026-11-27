@@ -281,7 +281,11 @@ final class Prompter: ObservableObject {
         listener.stop()
         slides.stop()
         Hotkeys.shared.disable()
-        let token = Int(base.rounded(.down))
+        // 下次从停下的那一句开头接着念（不从半句话开始）；念完了就从头
+        var token = Int(base.rounded(.down))
+        if activeMode != .keywords, token < script.count, !script.sentences.isEmpty {
+            token = script.sentences[script.sentence(ofToken: token)].firstToken
+        }
         let resume = token >= script.count ? 0 : documentOffset(ofToken: token)
         if let documentID { onStop?(documentID, resume) }
         ownSlides = false
