@@ -91,9 +91,84 @@ final class AppModel: ObservableObject {
         if recorder.take == url, let index = takes.firstIndex(of: url) {
             neighbour = index + 1 < takes.count ? takes[index + 1] : (index > 0 ? takes[index - 1] : nil)
         }
-        recorder.trash(url)
+        let wasShown = recorder.take == url
+        let undoManager = mainWindow?.undoManager
+        recorder.trash(url) { [weak self] trashed in
+            guard let self else { return }
+            // 找回来：⌘Z（列表里）和提示上的「撤销」都走这里，和删讲稿一样；已经找回来了就不再来一遍
+            var restored = false
+            let restore: () -> Void = { [weak self] in
+                guard let self, !restored else { return }
+                restored = true
+                guard self.recorder.restore(trashed, to: url) else { return }
+                self.notice = nil
+                if wasShown { self.recorder.show(url) }
+            }
+            undoManager?.registerUndo(withTarget: self) { _ in restore() }
+            undoManager?.setActionName(String(localized: "Move to Trash"))
+            self.announce(String(localized: "Moved to the Trash"), action: NoticeAction(title: String(localized: "Undo"), run: restore))
+        }
         if let neighbour { recorder.show(neighbour) }
-        announce(String(localized: "Moved to the Trash"))
+    }
+
+    /// 剪头去尾：留下 start…end 这一段（不重新编码，几乎一下就好），换掉原来那条（文件名、排的位置不变）。
+    /// 原来的进废纸篓：⌘Z（列表里）和提示上的「撤销」把它拿回来。
+    func trimTake(_ url: URL, from start: Double, to end: Double) {
+        guard end - start >= Playback.shortestTrim,
+              let export = AVAssetExportSession(asset: AVURLAsset(url: url), presetName: AVAssetExportPresetPassthrough) else { return }
+        // 先写到同一个文件夹里的隐藏文件（列表里看不见），好了再换上去
+        let temp = url.deletingLastPathComponent().appendingPathComponent(".trimming-\(UUID().uuidString).\(url.pathExtension)")
+        export.outputURL = temp
+        export.outputFileType = url.pathExtension.lowercased() == "mp4" ? .mp4 : .mov
+        export.timeRange = CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 600), end: CMTime(seconds: end, preferredTimescale: 600))
+        let created = (try? url.resourceValues(forKeys: [.creationDateKey]))?.creationDate
+        let undoManager = mainWindow?.undoManager
+        announce(String(localized: "Trimming…"), busy: true)
+        export.exportAsynchronously { [weak self] in
+            let done = export.status == .completed
+            let error = export.error?.localizedDescription
+            DispatchQueue.main.async {
+                guard let self else { return }
+                guard done else {
+                    try? FileManager.default.removeItem(at: temp)
+                    Log.info("trim failed: \(error ?? "?")")
+                    self.announce(String(localized: "Couldn’t trim the take"), problem: true)
+                    return
+                }
+                // 新文件记原来的录制时间：在列表里还排在原处
+                if let created { try? FileManager.default.setAttributes([.creationDate: created], ofItemAtPath: temp.path) }
+                self.recorder.trash(url) { [weak self] original in
+                    guard let self else { return }
+                    do {
+                        try FileManager.default.moveItem(at: temp, to: url)
+                    } catch {
+                        self.recorder.restore(original, to: url)
+                        try? FileManager.default.removeItem(at: temp)
+                        self.announce(String(localized: "Couldn’t trim the take"), problem: true)
+                        return
+                    }
+                    TakeRow.forget(url)
+                    self.recorder.refreshTakes()
+                    self.recorder.markSeen(url)
+                    self.recorder.show(url)
+                    var undone = false
+                    let undo: () -> Void = { [weak self] in
+                        guard let self, !undone else { return }
+                        undone = true
+                        self.recorder.trash(url) { [weak self] _ in
+                            guard let self else { return }
+                            TakeRow.forget(url)
+                            if self.recorder.restore(original, to: url) { self.recorder.show(url) }
+                            self.notice = nil
+                        }
+                    }
+                    undoManager?.registerUndo(withTarget: self) { _ in undo() }
+                    undoManager?.setActionName(String(localized: "Trim"))
+                    self.announce(String(localized: "Trimmed · the original is in the Trash"),
+                                  action: NoticeAction(title: String(localized: "Undo"), run: undo))
+                }
+            }
+        }
     }
 
     /// 设置、快捷键：在主窗口里浮起来的一块玻璃（不另开窗口）。
@@ -361,6 +436,11 @@ final class AppModel: ObservableObject {
         selection = store.documents.first?.id
         if let document { focus(document.resume) }
         loadDeck()
+        // 换了界面语言、自己重新打开的：把设置再打开，接着看
+        if UserDefaults.standard.bool(forKey: "reopenSettings") {
+            UserDefaults.standard.removeObject(forKey: "reopenSettings")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.show(.settings) }
+        }
         // 为了屏幕录制权限重新打开的：告诉一声可以录了
         if UserDefaults.standard.bool(forKey: "screenPermissionPending") {
             UserDefaults.standard.removeObject(forKey: "screenPermissionPending")
@@ -566,6 +646,24 @@ final class AppModel: ObservableObject {
             return
         }
         guard let document, !starting else { return }
+        // 第一次播放：这一次要用到的权限（摄像头、麦克风、语音识别）先一个接一个问完，再摆提词条、倒数，
+        // 不然倒数完、录上了才一下子蹦出一串系统对话框。要录屏幕又还没给屏幕权限的，先走下面那张屏幕权限的卡片。
+        let records = shot != nil && canPlay
+        if !(records && (shot?.needsScreen ?? false) && !ScreenCapture.allowed) {
+            let mode = prefs.mode
+            let camera = records && (shot?.needsCamera ?? false) && !UserDefaults.standard.bool(forKey: "fakeCamera")
+            let microphone = records || mode == .follow || mode == .pace
+            let speech = mode == .follow || (mode == .pace && prefs.adaptivePace)
+            if Permissions.unasked(camera: camera, microphone: microphone, speech: speech) {
+                starting = true
+                Permissions.ask(camera: camera, microphone: microphone, speech: speech) { [weak self] in
+                    guard let self else { return }
+                    self.starting = false
+                    self.play(fromBeginning: fromBeginning)
+                }
+                return
+            }
+        }
         recorder.dismiss()
         var offset = fromBeginning ? 0 : cursor
         // 配了幻灯片：光标停在某一页的话末尾（刚导入、刚粘贴完、点进那一行时都会这样），这一页就没得念了，

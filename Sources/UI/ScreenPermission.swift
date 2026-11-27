@@ -232,7 +232,7 @@ struct DragGuide: View {
                 AppIconDrag(dragging: { on in
                     withAnimation(.omoOut(0.2)) { isDragging = on }
                     dragging(on)
-                })
+                }, dropped: close)
                 .frame(width: 92, height: 92)
                 .shadow(color: .black.opacity(0.22), radius: 14, y: 6)
                 .scaleEffect(hovering && !isDragging ? 1.04 : 1)
@@ -319,21 +319,26 @@ struct DragGuide: View {
 }
 
 /// Eyeline 的图标：按住拖出去，拖的就是 Eyeline.app 本身（系统设置的列表收到它就加上）。
+/// 列表收下了（系统接着会问要不要退出并重新打开）：dropped，引导就收起来，不再指着那个对话框。
 private struct AppIconDrag: NSViewRepresentable {
     let dragging: (Bool) -> Void
+    let dropped: () -> Void
 
     func makeNSView(context: Context) -> DragView {
         let view = DragView()
         view.dragging = dragging
+        view.dropped = dropped
         return view
     }
 
     func updateNSView(_ view: DragView, context: Context) {
         view.dragging = dragging
+        view.dropped = dropped
     }
 
     final class DragView: NSView, NSDraggingSource {
         var dragging: ((Bool) -> Void)?
+        var dropped: (() -> Void)?
         private let icon = NSApp.applicationIconImage ?? NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath)
 
         override func draw(_ dirtyRect: NSRect) {
@@ -366,6 +371,7 @@ private struct AppIconDrag: NSViewRepresentable {
 
         func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
             dragging?(false)
+            if !operation.isEmpty { dropped?() }
         }
     }
 }

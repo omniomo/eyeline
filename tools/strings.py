@@ -69,7 +69,6 @@ ZH = {
     "Eyeline": "Eyeline",
     "Show in Finder": "在文件夹中显示",
     "Move to Trash": "移到废纸篓",
-    "Close  Esc": "关闭  Esc",
     "Allow the camera in System Settings": "请在系统设置中允许使用摄像头",
     "No camera found": "未找到摄像头",
     "The take couldn’t be saved": "录像未能存储",
@@ -109,8 +108,6 @@ ZH = {
     "Quick Start": "快速入门",
     "Interface language": "界面语言",
     "Follow System": "跟随系统",
-    "Takes effect after Eyeline reopens": "重新打开 Eyeline 后生效",
-    "Reopen Now": "立即重新打开",
     "Keyboard shortcuts": "键盘快捷键",
     "Keyboard Shortcuts": "键盘快捷键",
     "Show": "显示",
@@ -209,6 +206,16 @@ ZH = {
     "Deleted “%@”": "已删除「%@」",
     "Undo": "撤销",
     "Press ⌘⌫ to delete": "按 ⌘⌫ 删除",
+    "Choose what to record": "选择录制内容",
+    "New Script  ⌘N": "新建讲稿  ⌘N",
+    "Settings  ⌘,": "设置  ⌘,",
+    "Save Trim": "保存剪辑",
+    "Don’t trim  Esc": "不剪了  Esc",
+    "Drag to trim": "拖动把手，剪掉开头或结尾",
+    "Trim": "剪辑",
+    "Trimming…": "正在剪辑…",
+    "Trimmed · the original is in the Trash": "已剪好 · 原视频在废纸篓",
+    "Couldn’t trim the take": "没能剪好这段视频",
 }
 
 catalog = {"sourceLanguage": "en", "strings": {}, "version": "1.0"}

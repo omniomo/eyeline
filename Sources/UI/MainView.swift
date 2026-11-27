@@ -84,7 +84,26 @@ struct Sidebar: View {
     @ObservedObject var recorder: TakeRecorder
     @Environment(\.undoManager) private var undoManager
 
+    /// 标题行右边的按钮：图标右边和标题栏上「显示/隐藏侧栏」的图标对齐，上下一列；这一列本来就让开了滚动条。
+    static let headerTrailing: CGFloat = 6
+
     var body: some View {
+        VStack(spacing: 0) {
+            list
+            // 设置放在侧栏最下面（不放系统工具栏：窗口窄了它会被收起来）；⌘, 照旧
+            HStack(spacing: 0) {
+                HeaderButton(symbol: "gearshape", help: String(localized: "Settings  ⌘,"), tipAlignment: .topLeading) { model.show(.settings) }
+                Spacer(minLength: 0)
+            }
+            // 齿轮的左边和组标题、行里的缩略图对齐
+            .padding(.leading, 8)
+            .padding(.top, 6)
+            .padding(.bottom, 12)
+        }
+        // 删除要按 ⌘⌫（光按 ⌫ 太容易误删）：在 AppModel 的按键监听里
+    }
+
+    private var list: some View {
         ScrollViewReader { proxy in
             List(selection: $model.sidebarSelection) {
                 Section {
@@ -95,6 +114,8 @@ struct Sidebar: View {
                             .tag(AppModel.SidebarItem.script(document.id))
                             .listRowBackground(SelectionPill(selected: model.sidebarSelection == .script(document.id)))
                     }
+                } header: {
+                    SidebarHeader(title: "Scripts", symbol: "square.and.pencil", help: String(localized: "New Script  ⌘N"), size: 14.5) { model.newScript() }
                 }
                 // 录好的视频：新的在最上面，点一下在右边回放
                 if !recorder.takes.isEmpty {
@@ -106,12 +127,7 @@ struct Sidebar: View {
                                 .id(take.url)
                         }
                     } header: {
-                        // 「在访达中打开」紧跟在标题后面（放最右边会被滚动条挡住）
-                        HStack(spacing: 6) {
-                            Text("Takes")
-                            HeaderButton(symbol: "folder", help: String(localized: "Open in Finder")) { recorder.openFolder() }
-                            Spacer(minLength: 0)
-                        }
+                        SidebarHeader(title: "Takes", symbol: "folder", help: String(localized: "Open in Finder")) { recorder.openFolder() }
                     }
                 }
             }
@@ -127,17 +143,6 @@ struct Sidebar: View {
             // 刚录好一条：滚到它那里
             .onChangeOf(recorder.takes.first?.url) { _, url in
                 if let url { withAnimation(.omoOut(0.35)) { proxy.scrollTo(url) } }
-            }
-        }
-        // 删除要按 ⌘⌫（光按 ⌫ 太容易误删）：在 AppModel 的按键监听里
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { model.newScript() } label: { Image(systemName: "square.and.pencil") }
-                    .help(String(localized: "New Script"))
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button { model.show(.settings) } label: { Image(systemName: "gearshape") }
-                    .help(String(localized: "Settings"))
             }
         }
     }
@@ -266,6 +271,24 @@ struct SelectionPill: View {
             .fill(selected ? Paper.accentSoft : .clear)
             .padding(.horizontal, 8)
             .padding(.vertical, 1)
+    }
+}
+
+/// 左边列表一组的标题：名字，右边一个图标按钮（讲稿：新建；录像：在访达中打开）。几组的按钮右边对齐，见 Sidebar.headerTrailing。
+private struct SidebarHeader: View {
+    let title: LocalizedStringKey
+    let symbol: String
+    let help: String
+    var size: CGFloat = 13
+    let action: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title)
+            Spacer(minLength: 0)
+            HeaderButton(symbol: symbol, help: help, size: size, tipAlignment: .topTrailing, action: action)
+                .padding(.trailing, Sidebar.headerTrailing)
+        }
     }
 }
 

@@ -128,6 +128,10 @@ final class Prompter: ObservableObject {
     private var lastConfirm: CFTimeInterval = 0
     /// 说了一阵稿子以外的话、停下来时，重新开过一段识别（同一段自由发挥只开一次）。
     private var freshAfterAdlib: CFTimeInterval = 0
+    /// 认出了字、却一直没对上稿子：从什么时候开始的（0：没有）。还没认出字的时候不算。
+    private var unmatchedSince: CFTimeInterval = 0
+    /// 倒数时已经把麦克风和识别开起来了（release 时接着用，不再从头开）。
+    private var warmedUp = false
     private var hold: TimeInterval = 0
     private var countdownEnd: CFTimeInterval = 0
     private var finishedAt: CFTimeInterval = 0
@@ -282,6 +286,7 @@ final class Prompter: ObservableObject {
         if let documentID { onStop?(documentID, resume) }
         ownSlides = false
         held = false
+        warmedUp = false
         phase = .idle
         listenState = .off
         ribbon?.hide()
@@ -289,13 +294,28 @@ final class Prompter: ObservableObject {
 
     /// 按当前模式开始走。
     private func begin(initial: Bool) {
-        listener.stop()
         lead = 0
+        unmatchedSince = 0
+        let listens = activeMode == .follow || activeMode == .pace
         if held {
+            listener.stop()
             phase = .countdown
             countdownEnd = .infinity
+            // 倒数的时候就把麦克风和识别开起来：第一次开要一两秒才认得出字，倒数完一开口就跟得上。
+            // 这时认出来的字不算（见 heard）。
+            warmedUp = listens
+            if listens { listen(recognize: activeMode == .follow || (activeMode == .pace && prefs.adaptivePace)) }
             return
         }
+        if warmedUp, listens, listener.state != .off {
+            // 倒数时已经开着了：重开一段识别（倒数时说的不算），接着听
+            warmedUp = false
+            phase = .running
+            listener.restartTask()
+            return
+        }
+        warmedUp = false
+        listener.stop()
         switch activeMode {
         case .follow, .pace:
             phase = .running
@@ -317,7 +337,10 @@ final class Prompter: ObservableObject {
         listener.onText = { [weak self] text in self?.heard(text) }
         listener.onLevel = { [weak self] level in self?.heardLevel(level) }
         listener.onState = { [weak self] state in self?.listenerChanged(state) }
-        listener.onSegment = { [weak self] in self?.tracker.newSegment() }
+        listener.onSegment = { [weak self] in
+            self?.tracker.newSegment()
+            self?.unmatchedSince = 0
+        }
         // 跟声音只拿识别来量语速，用不着告诉它稿子里的词；
         // 跟读才要（产品名之类认得更准）。
         let words = activeMode == .follow ? contextualWords() : []
@@ -359,6 +382,8 @@ final class Prompter: ObservableObject {
     // MARK: 听到的
 
     private func heard(_ text: String) {
+        // 倒数时先开着听（热身），认出来的字不算
+        if phase == .countdown { return }
         if activeMode == .pace {
             measurePace(text)
             return
@@ -368,7 +393,11 @@ final class Prompter: ObservableObject {
             Log.info("ignored text: mode \(activeMode) phase \(phase) scrubbing \(scrubbing)")
             return
         }
-        guard let position = tracker.hear(text) else { return }
+        guard let position = tracker.hear(text) else {
+            if unmatchedSince == 0 { unmatchedSince = CACurrentMediaTime() }
+            return
+        }
+        unmatchedSince = 0
         Log.info("matched → \(position)\(phase == .paused ? " (resumes)" : "")")
         if phase == .paused {
             phase = .running
@@ -445,10 +474,13 @@ final class Prompter: ObservableObject {
             case .follow:
                 // 刚对上过才往前多走一点；说稿子以外的话时不往前蹭，停在那儿等你
                 if isTalking, now - lastConfirm < 1.2 { lead = min(lead + rate * dt, min(2.5, rate * 0.45)) }
-                // 说了一阵稿子以外的话（一秒半以上没对上），一停下来就重新开一段识别：
-                // 接着念稿子时，识别不会被刚才那些话拖着，对得上得快
-                if !isTalking, lastLoud > lastConfirm + 1.5, now - lastLoud > 0.45, freshAfterAdlib < lastLoud {
+                // 说了一阵稿子以外的话（认出了字、两秒都没对上），一停下来就重新开一段识别：
+                // 接着念稿子时，识别不会被刚才那些话拖着，对得上得快。
+                // 刚开口、识别还没出字的时候不算：那时重开，正在认的头几个字就丢了，反而要多等一两秒。
+                if !isTalking, lastLoud > lastConfirm + 1.5, unmatchedSince > 0, now - unmatchedSince > 2,
+                   now - lastLoud > 0.45, freshAfterAdlib < lastLoud {
                     freshAfterAdlib = now
+                    unmatchedSince = 0
                     listener.restartTask()
                     Log.info("off script, then a pause: fresh recognition")
                 }

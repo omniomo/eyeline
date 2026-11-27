@@ -322,13 +322,30 @@ final class TakeRecorder: NSObject, ObservableObject {
         NSWorkspace.shared.open(TakeRecorder.folder)
     }
 
-    func trash(_ url: URL? = nil) {
+    /// 移到废纸篓。trashed：移过去了，它在废纸篓里的位置（撤销时从那里拿回来）。
+    func trash(_ url: URL? = nil, trashed: ((URL) -> Void)? = nil) {
         guard let url = url ?? take else { return }
         if take == url { take = nil }
         takes.removeAll { $0.url == url }
-        NSWorkspace.shared.recycle([url]) { _, _ in
-            DispatchQueue.main.async { self.refreshTakes() }
+        NSWorkspace.shared.recycle([url]) { moved, _ in
+            DispatchQueue.main.async {
+                self.refreshTakes()
+                if let new = moved[url] ?? moved.values.first { trashed?(new) }
+            }
         }
+    }
+
+    /// 从废纸篓拿回原来的地方（删了又撤销）。拿不回来（废纸篓清了、原处又有同名的）就算了。
+    @discardableResult
+    func restore(_ trashed: URL, to url: URL) -> Bool {
+        do {
+            try FileManager.default.moveItem(at: trashed, to: url)
+        } catch {
+            return false
+        }
+        refreshTakes()
+        markSeen(url)
+        return true
     }
 
     /// 关掉回放：这一条算看过了。

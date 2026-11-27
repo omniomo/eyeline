@@ -219,11 +219,13 @@ enum TextCursor {
 
 extension View {
     /// 鼠标停一下就在上面冒出这句（底栏这些地方用；系统的 tooltip 要等一两秒）。
-    func hoverTip(_ text: String) -> some View { modifier(HoverTipModifier(text: text)) }
+    /// alignment：名字和图标哪边对齐。贴着侧栏边上的图标用 .topLeading / .topTrailing，名字不会被边切掉。
+    func hoverTip(_ text: String, alignment: Alignment = .top) -> some View { modifier(HoverTipModifier(text: text, alignment: alignment)) }
 }
 
 private struct HoverTipModifier: ViewModifier {
     let text: String
+    let alignment: Alignment
     @State private var tip = false
     @State private var task: Task<Void, Never>?
 
@@ -240,7 +242,7 @@ private struct HoverTipModifier: ViewModifier {
                     tip = false
                 }
             }
-            .overlay(alignment: .top) {
+            .overlay(alignment: alignment) {
                 if tip {
                     HoverTip(text: text)
                         .offset(y: -38)
@@ -306,7 +308,7 @@ struct CoachReporter: View {
     }
 }
 
-/// 三步：在哪写稿子、选一种走字方式、怎么开始和停。
+/// 四步：在哪写稿子、选一种走字方式、选录什么、怎么开始和停。
 /// 整个窗口暗下来，只留要指的那一块亮着、外面一圈主色；旁边一张白卡片写一句话，点「下一步」。
 /// 点哪里、按任意键都到下一步；Esc 跳过。
 struct CoachMarks: View {
@@ -317,6 +319,7 @@ struct CoachMarks: View {
     static let steps: [(key: String, text: String, placement: Placement)] = [
         ("script", String(localized: "Write here, or drop a script or slides in"), .center),
         ("modes", String(localized: "Pick how the words move"), .above),
+        ("shot", String(localized: "Choose what to record"), .above),
         ("play", String(localized: "⌘↩ to start, Esc to stop"), .aboveTrailing),
     ]
 
@@ -688,6 +691,8 @@ struct FloatingSheet<Content: View>: View {
     let close: () -> Void
     @ViewBuilder let content: Content
     @State private var shown = false
+    /// 里面的东西有多高（量出来的）：窗口放得下就整块摆出来，放不下就在玻璃里面滚。
+    @State private var contentHeight: CGFloat = 0
 
     var body: some View {
         GeometryReader { geometry in
@@ -696,12 +701,22 @@ struct FloatingSheet<Content: View>: View {
                     .contentShape(Rectangle())
                     .onTapGesture(perform: close)
                 // 上面空出一行给右上角的 ×
-                ViewThatFits(in: .vertical) {
-                    content.padding(.top, 24)
-                    ScrollView { content.padding(.top, 24) }
-                        .scrollIndicators(.never)
-                        .frame(height: max(200, geometry.size.height - 56))
+                // 窗口矮、放不下就在玻璃里面滚（上下各留一点）；放得下就整块摆出来，不滚。
+                // 高度是量出来的（ViewThatFits 有时会挑错，里面的东西就冒出玻璃外面）
+                let room = max(200, geometry.size.height - 56)
+                ScrollView {
+                    content
+                        .padding(.top, 24)
+                        .background(GeometryReader { inner in
+                            Color.clear.preference(key: SheetContentHeight.self, value: inner.size.height)
+                        })
                 }
+                .scrollIndicators(.never)
+                .scrollDisabled(contentHeight <= room)
+                .frame(height: contentHeight > 0 ? min(contentHeight, room) : room)
+                // 滚上去的部分不能画到玻璃外面（macOS 26 的滚动区默认不裁边）
+                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                .onPreferenceChange(SheetContentHeight.self) { contentHeight = $0 }
                 .fixedSize(horizontal: true, vertical: false)
                 .overlay(alignment: .topTrailing) {
                     Button(action: close) {
@@ -728,17 +743,26 @@ struct FloatingSheet<Content: View>: View {
     }
 }
 
+private struct SheetContentHeight: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 /// 小标题旁边的图标按钮：图标 13 点，鼠标放上去有一块浅底，冒出名字。
 struct HeaderButton: View {
     let symbol: String
     let help: String
+    /// 有的图标画得轻（铅笔那支）：大一点，看着和别的一样大。
+    var size: CGFloat = 13
+    /// 名字冒在哪边（贴边的按钮靠里对齐）。
+    var tipAlignment: Alignment = .top
     let action: () -> Void
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: size, weight: .medium))
                 .foregroundStyle(hovering ? Paper.accent : Paper.gray)
                 .frame(width: 26, height: 22)
                 .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(hovering ? Paper.accentSoft : .clear))
@@ -746,7 +770,7 @@ struct HeaderButton: View {
         }
         .buttonStyle(PressStyle())
         .onHover { hovering = $0 }
-        .hoverTip(help)
+        .hoverTip(help, alignment: tipAlignment)
         .accessibilityLabel(help)
     }
 }

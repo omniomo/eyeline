@@ -12,6 +12,9 @@ struct TakeRow: View {
     /// 封面和时长只算一次。
     private static var cache: [URL: (NSImage?, Double?)] = [:]
 
+    /// 这个文件换了内容（剪过）：封面、时长重新算。
+    static func forget(_ url: URL) { cache[url] = nil }
+
     var body: some View {
         SidebarRowLayout(dot: new) {
             if let thumbnail {
@@ -71,7 +74,8 @@ struct TakeRow: View {
 
 /// 回放一条录好的视频（刚录好的那条，或者在左边列表里点的那条），铺满编辑器。
 /// 点画面或者按空格：播放 / 暂停；← →：退后、前进 5 秒；↑ ↓：上一条、下一条；Esc：关掉。
-/// 下面一条可以拖的进度条，两头是现在的时间和总长。
+/// 下面一条可以拖的进度条，两头是现在的时间和总长。进度条两端各有一个把手，往里拖就是剪头去尾：
+/// 放的时候只放留下的这一段，右边的时长变成剪完的长度，旁边出来「保存剪辑」（Esc 或 ↩︎ 图标：不剪了）。
 struct TakeOverlay: View {
     @ObservedObject var recorder: TakeRecorder
     let url: URL
@@ -128,7 +132,7 @@ struct TakeOverlay: View {
                     .foregroundStyle(Paper.charcoal)
                     .frame(minWidth: 34, alignment: .trailing)
                 Scrubber(playback: playback)
-                Text(Prompter.clock(playback.duration))
+                Text(Prompter.clock(playback.isTrimmed ? playback.trimEnd - playback.trimStart : playback.duration))
                     .font(.system(size: 12).monospacedDigit())
                     .foregroundStyle(Paper.gray)
                     .frame(minWidth: 34, alignment: .leading)
@@ -141,13 +145,21 @@ struct TakeOverlay: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 12)
+                if playback.isTrimmed {
+                    IconToggle(symbol: "arrow.uturn.backward", selected: false, help: String(localized: "Don’t trim  Esc")) { playback.resetTrim() }
+                    PillButton(title: String(localized: "Save Trim")) {
+                        playback.player.pause()
+                        AppModel.shared.trimTake(url, from: playback.trimStart, to: playback.trimEnd)
+                    }
+                    .padding(.leading, 4)
+                    .padding(.trailing, 10)
+                }
                 IconToggle(symbol: "chevron.up", selected: false, help: String(localized: "Newer take  ↑")) { show(-1) }
                     .disabled((index ?? 0) == 0)
                 IconToggle(symbol: "chevron.down", selected: false, help: String(localized: "Older take  ↓")) { show(1) }
                     .disabled(index.map { $0 + 1 >= recorder.takes.count } ?? true)
                 IconToggle(symbol: "folder", selected: false, help: String(localized: "Show in Finder")) { recorder.reveal(url) }
                 IconToggle(symbol: "trash", selected: false, help: String(localized: "Move to Trash  ⌘⌫")) { AppModel.shared.trashTake(url) }
-                IconToggle(symbol: "xmark", selected: false, help: String(localized: "Close  Esc")) { recorder.dismiss() }
             }
         }
         .padding(.horizontal, 36)
@@ -165,7 +177,7 @@ struct TakeOverlay: View {
                 case .forward: playback.skip(5)
                 case .newer: show(-1)
                 case .older: show(1)
-                case .close: recorder.dismiss()
+                case .close: if playback.isTrimmed { playback.resetTrim() } else { recorder.dismiss() }
                 case .trash: AppModel.shared.trashTake(url)
                 }
             }
@@ -192,6 +204,12 @@ final class Playback: ObservableObject {
     @Published private(set) var aspect: CGFloat = 16 / 9
     /// 正在拖进度条：这时不让播放器的时间盖掉手指的位置。
     var scrubbing = false
+    /// 剪头去尾：留下的这一段（秒）。没剪是 0…duration。
+    @Published private(set) var trimStart: Double = 0
+    @Published private(set) var trimEnd: Double = 0
+    /// 剪完至少留这么长。
+    static let shortestTrim: Double = 0.5
+    var isTrimmed: Bool { duration > 0 && (trimStart > 0.05 || trimEnd < duration - 0.05) }
     weak var window: NSWindow?
     var onKey: ((Key) -> Void)?
 
@@ -205,7 +223,10 @@ final class Playback: ObservableObject {
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 30), queue: .main) { [weak self] now in
             guard let self else { return }
             if !self.scrubbing, now.seconds.isFinite { self.time = now.seconds }
-            if let total = self.player.currentItem?.duration.seconds, total.isFinite, total > 0, total != self.duration { self.duration = total }
+            if let total = self.player.currentItem?.duration.seconds, total.isFinite, total > 0, total != self.duration {
+                self.duration = total
+                if self.trimEnd <= 0 || self.trimEnd > total { self.trimEnd = total }
+            }
             let moving = self.player.timeControlStatus != .paused
             if moving != self.playing { self.playing = moving }
         }
@@ -257,8 +278,9 @@ final class Playback: ObservableObject {
 
     func toggle() {
         if player.timeControlStatus == .paused {
-            // 放完了再按：从头放
-            if duration > 0 && time >= duration - 0.1 { seek(to: 0) }
+            // 放完了再按：从头放（剪过的：从留下的那段开头放）
+            let end = isTrimmed ? trimEnd : duration
+            if duration > 0 && (time >= end - 0.1 || time < trimStart - 0.05) { seek(to: trimStart) }
             player.play()
             playing = true
         } else {
@@ -271,6 +293,34 @@ final class Playback: ObservableObject {
         seek(to: time + seconds)
     }
 
+    /// 拖把手：开头、结尾（中间至少留 shortestTrim 秒）。画面跟着停在那一帧。
+    func setTrimStart(_ seconds: Double) {
+        guard duration > 0 else { return }
+        trimStart = min(max(0, seconds), trimEnd - Playback.shortestTrim)
+        applyTrim()
+        seek(to: trimStart)
+    }
+
+    func setTrimEnd(_ seconds: Double) {
+        guard duration > 0 else { return }
+        trimEnd = max(min(duration, seconds), trimStart + Playback.shortestTrim)
+        applyTrim()
+        seek(to: trimEnd)
+    }
+
+    /// 不剪了：两头回到最开始和最后。
+    func resetTrim() {
+        trimStart = 0
+        trimEnd = duration
+        applyTrim()
+    }
+
+    /// 放到留下的那段末尾就停（系统帮着停，停了会发「放完了」）。
+    private func applyTrim() {
+        player.currentItem?.forwardPlaybackEndTime = isTrimmed && trimEnd < duration - 0.05
+            ? CMTime(seconds: trimEnd, preferredTimescale: 600) : .invalid
+    }
+
     func seek(to seconds: Double) {
         let target = max(0, duration > 0 ? min(duration, seconds) : seconds)
         time = target
@@ -279,21 +329,33 @@ final class Playback: ObservableObject {
 }
 
 /// 可以拖的进度条：细线，放过的部分是主色，手指按住的地方有个小圆点。
+/// 两端各一个竖着的小把手：往里拖，剪掉开头、结尾；剪掉的那两截颜色更淡。
 struct Scrubber: View {
     @ObservedObject var playback: Playback
     @State private var hovering = false
+    @State private var handle: Handle?
+
+    private enum Handle { case start, end }
 
     var body: some View {
         GeometryReader { geometry in
             let width = max(1, geometry.size.width)
-            let fraction = playback.duration > 0 ? min(1, max(0, playback.time / playback.duration)) : 0
+            let total = playback.duration
+            let x = { (seconds: Double) -> CGFloat in total > 0 ? width * CGFloat(min(1, max(0, seconds / total))) : 0 }
+            let start = x(playback.trimStart)
+            let end = total > 0 ? x(playback.trimEnd) : width
+            let now = min(max(x(playback.time), start), end)
+            let big = hovering || playback.scrubbing
             ZStack(alignment: .leading) {
-                Capsule().fill(Paper.line).frame(height: 4)
-                Capsule().fill(Paper.accent).frame(width: width * fraction, height: 4)
+                Capsule().fill(Paper.line.opacity(0.45)).frame(height: 4)
+                Capsule().fill(Paper.line).frame(width: max(4, end - start), height: 4).offset(x: start)
+                Capsule().fill(Paper.accent).frame(width: max(0, now - start), height: 4).offset(x: start)
                 Circle()
                     .fill(Paper.accent)
-                    .frame(width: hovering || playback.scrubbing ? 12 : 8, height: hovering || playback.scrubbing ? 12 : 8)
-                    .offset(x: width * fraction - (hovering || playback.scrubbing ? 6 : 4))
+                    .frame(width: big ? 12 : 8, height: big ? 12 : 8)
+                    .offset(x: now - (big ? 6 : 4))
+                trimHandle(.start, at: start, width: width)
+                trimHandle(.end, at: end, width: width)
             }
             .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
@@ -305,10 +367,36 @@ struct Scrubber: View {
                     }
                     .onEnded { _ in playback.scrubbing = false }
             )
+            .coordinateSpace(name: "scrubber")
         }
         .frame(height: 22)
         .onHover { hovering = $0 }
         .animation(.omoOut(0.2), value: hovering)
+    }
+
+    /// 一个把手：细细一竖，鼠标放上来、在拖、或者已经剪过时是主色。
+    private func trimHandle(_ which: Handle, at position: CGFloat, width: CGFloat) -> some View {
+        let active = handle == which || playback.isTrimmed
+        return RoundedRectangle(cornerRadius: 2, style: .continuous)
+            .fill(active ? Paper.accent : Paper.gray.opacity(hovering ? 0.75 : 0.4))
+            .frame(width: 4, height: 16)
+            .frame(width: 16, height: 22)
+            .contentShape(Rectangle())
+            .offset(x: position - 8)
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .named("scrubber"))
+                    .onChanged { value in
+                        handle = which
+                        playback.scrubbing = true
+                        let seconds = Double(min(1, max(0, value.location.x / width))) * playback.duration
+                        if which == .start { playback.setTrimStart(seconds) } else { playback.setTrimEnd(seconds) }
+                    }
+                    .onEnded { _ in
+                        handle = nil
+                        playback.scrubbing = false
+                    }
+            )
+            .hoverTip(String(localized: "Drag to trim"))
     }
 }
 

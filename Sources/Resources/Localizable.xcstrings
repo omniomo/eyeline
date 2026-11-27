@@ -311,22 +311,22 @@
         }
       }
     },
+    "Choose what to record": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择录制内容"
+          }
+        }
+      }
+    },
     "Clicker": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "翻页笔"
-          }
-        }
-      }
-    },
-    "Close  Esc": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "关闭  Esc"
           }
         }
       }
@@ -357,6 +357,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法读取此文件"
+          }
+        }
+      }
+    },
+    "Couldn’t trim the take": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没能剪好这段视频"
           }
         }
       }
@@ -447,6 +457,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "不录制"
+          }
+        }
+      }
+    },
+    "Don’t trim  Esc": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不剪了  Esc"
+          }
+        }
+      }
+    },
+    "Drag to trim": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖动把手，剪掉开头或结尾"
           }
         }
       }
@@ -981,6 +1011,16 @@
         }
       }
     },
+    "New Script  ⌘N": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建讲稿  ⌘N"
+          }
+        }
+      }
+    },
     "Newer take  ↑": {
       "localizations": {
         "zh-Hans": {
@@ -1421,16 +1461,6 @@
         }
       }
     },
-    "Reopen Now": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "立即重新打开"
-          }
-        }
-      }
-    },
     "Resume": {
       "localizations": {
         "zh-Hans": {
@@ -1447,6 +1477,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "提词条"
+          }
+        }
+      }
+    },
+    "Save Trim": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存剪辑"
           }
         }
       }
@@ -1527,6 +1567,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "设置"
+          }
+        }
+      }
+    },
+    "Settings  ⌘,": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置  ⌘,"
           }
         }
       }
@@ -1831,16 +1881,6 @@
         }
       }
     },
-    "Takes effect after Eyeline reopens": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重新打开 Eyeline 后生效"
-          }
-        }
-      }
-    },
     "Thanks": {
       "localizations": {
         "zh-Hans": {
@@ -1907,6 +1947,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "提词条显示期间，以下快捷键在所有 App 中均可使用；提词条关闭后即恢复。"
+          }
+        }
+      }
+    },
+    "Trim": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "剪辑"
+          }
+        }
+      }
+    },
+    "Trimmed · the original is in the Trash": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已剪好 · 原视频在废纸篓"
+          }
+        }
+      }
+    },
+    "Trimming…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在剪辑…"
           }
         }
       }

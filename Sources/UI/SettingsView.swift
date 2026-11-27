@@ -6,8 +6,6 @@ struct SettingsView: View {
     var openShortcuts: () -> Void = {}
     var onRibbonChange: () -> Void = {}
     @State private var appLanguage = AppLanguage.current
-    /// 换了界面语言：重新打开才生效。
-    @State private var languageChanged = false
     /// 识别语言的下拉开着。
     @State private var languageMenu = false
     /// 登录时打开：读系统里的真实状态（默认没加进登录项）。
@@ -22,11 +20,6 @@ struct SettingsView: View {
                         (AppLanguage.english, "English"),
                         (AppLanguage.chinese, "简体中文"),
                     ])
-                }
-                if languageChanged {
-                    SettingsRow(String(localized: "Takes effect after Eyeline reopens"), secondary: true) {
-                        PillButton(title: String(localized: "Reopen Now")) { AppLanguage.relaunch() }
-                    }
                 }
                 SettingsRow(String(localized: "Open at login")) {
                     Switch(isOn: $openAtLogin)
@@ -100,7 +93,11 @@ struct SettingsView: View {
         }
         .onChangeOf(appLanguage) { _, language in
             language.apply()
-            withAnimation(.omoOut(0.25)) { languageChanged = language != AppLanguage.launched }
+            // 换了语言马上生效：自己重新打开一次（界面的文字只在打开时读），打开后设置还在
+            if language != AppLanguage.launched {
+                UserDefaults.standard.set(true, forKey: "reopenSettings")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { AppLanguage.relaunch() }
+            }
         }
         .onChangeOf(prefs.size) { _, _ in onRibbonChange() }
         .onChangeOf(prefs.display) { _, _ in onRibbonChange() }
@@ -160,7 +157,7 @@ private struct SettingsRow<Control: View>: View {
     }
 }
 
-/// 界面用什么语言：跟系统，或者固定英文 / 简体中文（写进这个 app 自己的 AppleLanguages，重新打开生效）。
+/// 界面用什么语言：跟系统，或者固定英文 / 简体中文（写进这个 app 自己的 AppleLanguages；换了就自己重新打开一次）。
 enum AppLanguage: String, Hashable {
     case system, english = "en", chinese = "zh-Hans"
 

@@ -7,6 +7,34 @@ import Speech
 // 识别任务隔一阵子、或者识别出错、或者位置被手动改了，就重新开一个：
 // 新任务的文字从头算，旧任务迟到的结果按 generation 丢掉。
 
+/// 播放之前先把这一次要用到的权限问完：摄像头、麦克风、语音识别，一个接一个，只问还没问过的。
+/// 给不给都接着走（不给的各有退路：录不了人像、匀速走、跟着声音走），只是不会倒数完、录上了才突然一起弹出来。
+enum Permissions {
+    static func unasked(camera: Bool, microphone: Bool, speech: Bool) -> Bool {
+        (camera && AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined)
+            || (microphone && AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined)
+            || (speech && SFSpeechRecognizer.authorizationStatus() == .notDetermined)
+    }
+
+    static func ask(camera: Bool, microphone: Bool, speech: Bool, then done: @escaping () -> Void) {
+        if camera, AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined {
+            AVCaptureDevice.requestAccess(for: .video) { _ in
+                DispatchQueue.main.async { ask(camera: false, microphone: microphone, speech: speech, then: done) }
+            }
+        } else if microphone, AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
+            AVCaptureDevice.requestAccess(for: .audio) { _ in
+                DispatchQueue.main.async { ask(camera: false, microphone: false, speech: speech, then: done) }
+            }
+        } else if speech, SFSpeechRecognizer.authorizationStatus() == .notDetermined {
+            SFSpeechRecognizer.requestAuthorization { _ in
+                DispatchQueue.main.async { done() }
+            }
+        } else {
+            done()
+        }
+    }
+}
+
 final class Listener {
     enum State: Equatable {
         case off, starting, listening
