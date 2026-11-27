@@ -21,7 +21,7 @@ Eyeline doesn't go online and collects nothing. It uses the speech recognition b
 
 ## Donate
 
-If Eyeline helps you: [GitHub Sponsors](https://github.com/sponsors/omniomo) · [Ko-fi](https://ko-fi.com/aerisz)
+If Eyeline helps you: [GitHub Sponsors](https://github.com/sponsors/omniomo)
 
 ## License
 

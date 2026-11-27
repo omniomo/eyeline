@@ -21,7 +21,7 @@ Eyeline 不联网，不收集任何东西。语音识别用的是 macOS 自带�
 
 ## 赞助
 
-觉得好用的话：[GitHub Sponsors](https://github.com/sponsors/omniomo) · [Ko-fi](https://ko-fi.com/aerisz)
+觉得好用的话：[GitHub Sponsors](https://github.com/sponsors/omniomo)
 
 ## License
 
