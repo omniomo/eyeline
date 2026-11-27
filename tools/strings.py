@@ -211,7 +211,6 @@ ZH = {
     "Settings  ⌘,": "设置  ⌘,",
     "Save Trim": "保存剪辑",
     "Don’t trim  Esc": "不剪了  Esc",
-    "Drag to trim": "拖动把手，剪掉开头或结尾",
     "Trim": "剪辑",
     "Trimming…": "正在剪辑…",
     "Trimmed · the original is in the Trash": "已剪好 · 原视频在废纸篓",

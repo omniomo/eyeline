@@ -374,15 +374,20 @@ struct Scrubber: View {
         .animation(.omoOut(0.2), value: hovering)
     }
 
-    /// 一个把手：细细一竖，鼠标放上来、在拖、或者已经剪过时是主色。
+    /// 一个把手：看着是细细一竖，能按的地方大得多（28×34，不占位置），好抓；鼠标放上来变成左右箭头。
+    /// 在拖、或者已经剪过时是主色。
     private func trimHandle(_ which: Handle, at position: CGFloat, width: CGFloat) -> some View {
         let active = handle == which || playback.isTrimmed
         return RoundedRectangle(cornerRadius: 2, style: .continuous)
             .fill(active ? Paper.accent : Paper.gray.opacity(hovering ? 0.75 : 0.4))
             .frame(width: 4, height: 16)
+            // 占的位置和进度条一样高（不然整条进度条会被撑得往下掉）；能按的地方往外多出 6 点
             .frame(width: 16, height: 22)
-            .contentShape(Rectangle())
+            .contentShape(Rectangle().inset(by: -6))
             .offset(x: position - 8)
+            .onHover { inside in
+                if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+            }
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .named("scrubber"))
                     .onChanged { value in
@@ -396,7 +401,6 @@ struct Scrubber: View {
                         playback.scrubbing = false
                     }
             )
-            .hoverTip(String(localized: "Drag to trim"))
     }
 }
 
@@ -422,6 +426,8 @@ struct PlayerSurface: NSViewRepresentable {
 
 final class PlayerLayerView: NSView {
     let playerLayer = AVPlayerLayer()
+    /// 盖在画面边上的一圈底色（见 init）。
+    private let edge = CALayer()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -430,8 +436,20 @@ final class PlayerLayerView: NSView {
         layer?.cornerRadius = 12
         layer?.cornerCurve = .continuous
         layer?.masksToBounds = true
-        playerLayer.videoGravity = .resizeAspect
+        // 画面比框大一圈（见 layout），铺满再被圆角裁掉：框的尺寸对不上整像素、或者系统把视频直接交给显示硬件画的时候，
+        // 视频边上会时有时无地露出一道暗色细缝；多出来的这一圈正好把它盖在框外面。
+        playerLayer.videoGravity = .resizeAspectFill
+        playerLayer.backgroundColor = .clear
+        // 播放时 macOS 会把画面直接交给显示硬件去画（不走普通的合成，所以截图、录屏都看不到），
+        // 这时画面四周时有时无地闪一道黑细线。不完全不透明、上面又压着一层的画面不会被这样交出去：
+        // 透明度留一点点（看不出来），四周再盖一圈和背景同色的细边（顺带盖住边上的接缝）。
+        playerLayer.opacity = 0.995
         layer?.addSublayer(playerLayer)
+        edge.borderWidth = 1.5
+        edge.borderColor = NSColor(Paper.white).cgColor
+        edge.cornerRadius = 12
+        edge.cornerCurve = .continuous
+        layer?.addSublayer(edge)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -443,7 +461,8 @@ final class PlayerLayerView: NSView {
         super.layout()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        playerLayer.frame = bounds
+        playerLayer.frame = bounds.insetBy(dx: -1, dy: -1)
+        edge.frame = bounds
         CATransaction.commit()
     }
 }

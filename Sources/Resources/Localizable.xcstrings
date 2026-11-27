@@ -471,16 +471,6 @@
         }
       }
     },
-    "Drag to trim": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "拖动把手，剪掉开头或结尾"
-          }
-        }
-      }
-    },
     "Duplicate": {
       "localizations": {
         "zh-Hans": {
