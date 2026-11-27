@@ -8,12 +8,12 @@
     <a href="README.md">English</a>
   </p>
   <br>
-  <img src="docs/shots/slides.webp" width="720" alt="把幻灯片拖进 Eyeline，每一页带着自己的台词">
+  <img src="docs/shots/hero.webp" width="720" alt="写好稿子或者拖进幻灯片，点播放，台词就在摄像头正下方走">
 </div>
 
 ## 安装
 
-在[最新版本](https://github.com/omniomo/eyeline/releases/latest)里下载 dmg，把 Eyeline 拖进「应用程序」。macOS 13 及以上，Apple 芯片和 Intel 都能用。
+在[最新版本](https://github.com/omniomo/eyeline/releases/latest)里下载 dmg，把 Eyeline 拖进「应用程序」。macOS 14 及以上，Apple 芯片和 Intel 都能用。
 
 ## 隐私
 
