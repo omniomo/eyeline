@@ -59,8 +59,37 @@ final class ScriptStore: ObservableObject {
         if documents.isEmpty {
             documents = [ScriptDocument(text: ScriptStore.sample)]
             save(now: true)
+        } else {
+            localizeSample()
         }
     }
+
+    /// 示例讲稿还没动过：换成现在界面语言的那一版（换界面语言时 Eyeline 会自己重新打开，打开时换）。
+    /// 改过一个字（或者配了幻灯片）就是自己的稿子了，不动。
+    private func localizeSample() {
+        let current = ScriptStore.sample
+        var changed = false
+        for index in documents.indices where documents[index].text != current && documents[index].slides == nil
+            && ScriptStore.knownSamples.contains(ScriptStore.squeezed(documents[index].text)) {
+            documents[index].text = current
+            documents[index].resume = 0
+            changed = true
+        }
+        if changed { save(now: true) }
+    }
+
+    /// 示例讲稿出过的各版（中英文；早先写的是按 Option 加空格），去掉空白来比，空行多一个少一个都算同一版。
+    static let knownSamples: Set<String> = {
+        let older = [
+            sampleChinese.replacingOccurrences(of: "想停一下，按空格。想退回一句，按左方向键。",
+                                               with: "想停一下，按 Option 加空格。想退回一句，按 Option 加左方向键。"),
+            sampleEnglish.replacingOccurrences(of: "To pause, press Space. To go back a line, press the left arrow.",
+                                               with: "To pause, press Option and Space. To go back a line, press Option and the left arrow."),
+        ]
+        return Set(([sampleChinese, sampleEnglish] + older).map(squeezed))
+    }()
+
+    static func squeezed(_ text: String) -> String { text.filter { !$0.isWhitespace } }
 
     subscript(id: UUID?) -> ScriptDocument? {
         documents.first { $0.id == id }
@@ -156,7 +185,7 @@ final class ScriptStore: ObservableObject {
     字会跟着你的声音往前走，你只要一直看着摄像头下面那一点。
     在镜头里，你就是在看着屏幕前的人。⏸
     念错了也没关系，从这句的开头重新念，它会自己跳回来。
-    想停一下，按 Option 加空格。想退回一句，按 Option 加左方向键。
+    想停一下，按空格。想退回一句，按左方向键。
     （括号里的字是写给自己看的，不用念。）
     最后一句念完，这条字幕会收回到摄像头里。
     """
@@ -168,7 +197,7 @@ final class ScriptStore: ObservableObject {
     The words move with your voice, so you can keep your eyes right under the camera.
     On camera, you are looking straight at the person watching. ⏸
     If you trip over a line, just start it again from the top, and it jumps back with you.
-    To pause, press Option and Space. To go back a line, press Option and the left arrow.
+    To pause, press Space. To go back a line, press the left arrow.
     (Words in brackets are notes for you. You don't read them.)
     When you finish the last line, the ribbon slides back into the camera.
     """
